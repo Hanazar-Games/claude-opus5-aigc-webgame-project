@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#05060d">
+<meta name="description" content="星海拾荒者 —— 一款在浏览器中运行的霓虹幸存者类 Roguelite 游戏。">
+<title>星海拾荒者 · Starfall Scavenger</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🛸</text></svg>">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <div class="hud-top">
+      <div class="bar-wrap">
+        <div class="bar hp"><div id="hp-fill" class="fill"></div><span id="hp-text">100 / 100</span></div>
+        <div class="bar xp"><div id="xp-fill" class="fill"></div><span id="xp-text">Lv.1</span></div>
+      </div>
+      <div class="stats">
+        <span id="timer">00:00</span>
+        <span id="kills">☠ 0</span>
+      </div>
+    </div>
+    <div id="loadout" class="loadout"></div>
+    <button id="btn-pause" class="icon-btn" aria-label="暂停">II</button>
+  </div>
+
+  <div id="overlay" class="overlay">
+    <div id="panel-title" class="panel">
+      <h1 class="logo">星海拾荒者</h1>
+      <p class="sub">STARFALL SCAVENGER</p>
+      <p class="desc">自动开火 · 移动闪避 · 收集星尘升级<br>活得越久，星海越危险。</p>
+      <button class="btn primary" data-action="start">开始游戏</button>
+      <div class="best">最佳纪录：<span id="best-title">--</span></div>
+      <p class="hint">WASD / 方向键移动 · 触屏拖动摇杆 · P 暂停</p>
+    </div>
+
+    <div id="panel-levelup" class="panel hidden">
+      <h2 class="lvup">等级提升！</h2>
+      <div id="cards" class="cards"></div>
+    </div>
+
+    <div id="panel-pause" class="panel hidden">
+      <h2>已暂停</h2>
+      <button class="btn primary" data-action="resume">继续</button>
+      <button class="btn" data-action="quit">放弃本局</button>
+      <label class="toggle"><input type="checkbox" id="mute"> 静音</label>
+    </div>
+
+    <div id="panel-over" class="panel hidden">
+      <h2 class="dead">信号丢失</h2>
+      <div class="result">
+        <div><b id="r-time">00:00</b><span>存活时间</span></div>
+        <div><b id="r-kills">0</b><span>击杀</span></div>
+        <div><b id="r-level">1</b><span>等级</span></div>
+      </div>
+      <div id="r-best" class="best"></div>
+      <button class="btn primary" data-action="start">再来一局</button>
+    </div>
+  </div>
+
+  <div id="joystick" class="joystick hidden"><div id="joystick-knob"></div></div>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
