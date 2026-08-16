@@ -12,8 +12,12 @@ sound is synthesised at runtime with WebAudio.
 - **Shoot** — automatic. Most weapons hit the nearest enemy; missiles and beams prioritise the Mothership
 - **Grow** — kills drop stardust; collect it to level up and pick 1 of 3 cards
 - **Pause** — `P` / `Esc` / the button in the corner
-- A **Mothership** arrives every 90 seconds. Enemies get faster, tougher and denser as you survive
-- **Elites** (gold outline) are slow and tanky but worth 8× XP and always drop an item
+- A **Mothership** arrives every 90 seconds, and the gap shrinks each time one appears. Enemies get faster, tougher and denser as you survive
+- **Elites** (gold outline) are slow and tanky but worth 8× XP and always drop an item.
+  Past 100s they carry a modifier, shown as a coloured dashed ring:
+  - 🟢 **Splitter** — shatters into four chaff when killed
+  - 🔴 **Volley** — fires rings of bullets you cannot shoot down
+  - 🔵 **Haste** — accelerates continuously until it catches you
 - **Items** — ✚ Heal · Magnet (pulls in every orb on the field) · Orbital Strike (screen-wide blast)
 - Off-screen Motherships, elites and items are flagged by arrows at the screen edge
 

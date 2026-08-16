@@ -1,4 +1,4 @@
-import { TAU, clamp, rand, random, angleTo, weightedPick } from './util.js';
+import { TAU, clamp, rand, random, pick, angleTo, weightedPick } from './util.js';
 import { WEAPONS, ENEMIES, SPAWN_TABLE, BOSS_INTERVAL, STAT_UPGRADES, HEAL_CARD } from './content.js';
 import { sfx } from './audio.js';
 import { readMove } from './input.js';
@@ -72,19 +72,35 @@ G.nearestEnemy = (from, maxD = 900, idx = 0, prefer = false) => {
     }
     if (bb) return bb;
   }
-  let best = null, bd = Infinity;
-  const cands = idx > 0 ? [] : null;
-  for (const e of G.enemies) {
-    const dx = e.x - from.x, dy = e.y - from.y, d = dx * dx + dy * dy;
-    if (d > md2) continue;
-    if (cands) cands.push([d, e]);
-    else if (d < bd) { bd = d; best = e; }
+  if (idx === 0) {
+    let best = null, bd = Infinity;
+    for (const e of G.enemies) {
+      const d = (e.x - from.x) ** 2 + (e.y - from.y) ** 2;
+      if (d <= md2 && d < bd) { bd = d; best = e; }
+    }
+    return best;
   }
-  if (!cands) return best;
-  if (!cands.length) return null;
-  cands.sort((a, b) => a[0] - b[0]);
-  return cands[Math.min(idx, cands.length - 1)][1];
+  // Nth-nearest via top-K selection. Collecting every candidate and sorting cost
+  // ~18ms/frame once volleys of 6 missiles each did it against 380 enemies.
+  const k = idx + 1;
+  const bE = _topE, bD = _topD;
+  let n = 0;
+  for (const e of G.enemies) {
+    const d = (e.x - from.x) ** 2 + (e.y - from.y) ** 2;
+    if (d > md2) continue;
+    if (n < k) {                        // insertion into a tiny sorted buffer
+      let i = n++;
+      while (i > 0 && bD[i - 1] > d) { bD[i] = bD[i - 1]; bE[i] = bE[i - 1]; i--; }
+      bD[i] = d; bE[i] = e;
+    } else if (d < bD[k - 1]) {
+      let i = k - 1;
+      while (i > 0 && bD[i - 1] > d) { bD[i] = bD[i - 1]; bE[i] = bE[i - 1]; i--; }
+      bD[i] = d; bE[i] = e;
+    }
+  }
+  return n ? bE[Math.min(idx, n - 1)] : null;
 };
+const _topE = [], _topD = [];
 
 G.spawnBullet = o => {
   G.bullets.push({
@@ -133,7 +149,14 @@ function killEnemy(e) {
     G.texts.push({ x: e.x, y: e.y - 40, t: 0, v: 'MOTHERSHIP DOWN', color: '#5cff9d', big: true, life: 2 });
   } else {
     sfx.kill();
-    if (e.elite) dropPickup(e.x, e.y, weightedPick(DROPS).kind);
+    if (e.elite) {
+      dropPickup(e.x, e.y, weightedPick(DROPS).kind);
+      if (e.affix === 'splitter')
+        for (let i = 0; i < 4; i++) {
+          const a = i * TAU / 4 + rand(0.6);
+          spawnEnemy(e.type, { x: e.x + Math.cos(a) * 34, y: e.y + Math.sin(a) * 34 }, true);
+        }
+    }
   }
 }
 
@@ -188,14 +211,15 @@ function spawnPoint() {
   return { x: G.player.x + Math.cos(a) * d, y: G.player.y + Math.sin(a) * d };
 }
 
-function spawnEnemy(type, at) {
+function spawnEnemy(type, at, forceNormal = false) {
   const def = ENEMIES[type];
   const t = G.time;
   const hpMult = 1 + t / 80 + (t / 190) ** 2 + (def.boss ? (G.bossCount - 1) * 0.75 : 0);
   const dmgMult = 1 + t / 200;
   const p = at || spawnPoint();
   // Elites: rare, fat, slow, worth a lot — they hand out the run's power spikes.
-  const elite = !def.boss && t > 45 && random() < 0.045;
+  // They also get steadily more common, which is most of the late-game pressure.
+  const elite = !forceNormal && !def.boss && t > 45 && random() < 0.035 + t / 14000;
   const hp = def.hp * hpMult * (elite ? 4 : 1);
   G.enemies.push({
     type, x: p.x, y: p.y, vx: 0, vy: 0, hp, maxHp: hp,
@@ -203,15 +227,26 @@ function spawnEnemy(type, at) {
     speed: def.speed * (1 + t / 600) * (def.boss ? 1 : rand(1.1, 0.9)) * (elite ? 0.72 : 1),
     dmg: def.dmg * dmgMult * (elite ? 1.3 : 1),
     color: def.color, shape: def.shape, xp: def.xp * (elite ? 8 : 1) * (1 + t / 150),
-    boss: !!def.boss, elite,
-    flash: 0, shootT: rand(2), orbCd: 0, wob: rand(TAU), def,
+    boss: !!def.boss, elite, affix: elite && t > 100 ? pick(AFFIXES) : null,
+    flash: 0, shootT: rand(2), orbCd: 0, wob: rand(TAU), volleyT: rand(2), def,
   });
 }
+
+/**
+ * Elite modifiers. Each one attacks a different assumption an evolved build makes:
+ * splitter punishes clearing your radius, volley ignores it entirely (bullets
+ * can't be shot down), haste closes the gap kiting relies on.
+ */
+const AFFIXES = ['splitter', 'volley', 'haste'];
+const AFFIX_COLOR = { splitter: '#5cff9d', volley: '#ff4d5e', haste: '#4df3ff' };
 
 function director(dt) {
   const t = G.time;
   if (t >= G.nextBoss) {
-    G.nextBoss += BOSS_INTERVAL; G.bossCount++;
+    G.bossCount++;
+    // Motherships are the only threat that scales with kill count, so tighten
+    // their cadence over a run — this is what ends otherwise-unbounded games.
+    G.nextBoss += Math.max(42, BOSS_INTERVAL - G.bossCount * 9);
     spawnEnemy('boss');
     G.texts.push({ x: G.player.x, y: G.player.y - 70, t: 0, v: 'MOTHERSHIP INBOUND', color: '#ff4d5e', big: true, life: 2.4 });
     sfx.boss();
@@ -270,6 +305,20 @@ export function update(dt) {
     e.x += e.vx * dt; e.y += e.vy * dt;
     e.flash = Math.max(0, e.flash - dt);
     e.orbCd = Math.max(0, e.orbCd - dt);
+
+    if (e.affix === 'haste') e.speed = Math.min(e.speed * (1 + dt * 0.11), 300);
+    if (e.affix === 'volley') {
+      e.volleyT += dt;
+      if (e.volleyT >= 2.4) {
+        e.volleyT = 0;
+        const base = angleTo(e, p);
+        for (let i = 0; i < 8; i++) {
+          const ang = base + i * TAU / 8;
+          G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(ang) * 200, vy: Math.sin(ang) * 200,
+            r: 6, dmg: 12 * (1 + G.time / 200), life: 4.5, color: '#ff4d5e' });
+        }
+      }
+    }
 
     if (e.def.shoot) {
       e.shootT += dt;

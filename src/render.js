@@ -2,6 +2,8 @@ import { TAU, rand, clamp } from './util.js';
 import { G } from './game.js';
 import { WEAPONS } from './content.js';
 
+const AFFIX_TINT = { splitter: '#5cff9d', volley: '#ff4d5e', haste: '#4df3ff' };
+
 let stars = [];
 export function seedStars(n = 260) {
   stars = Array.from({ length: n }, () => ({
@@ -120,6 +122,18 @@ export function render(ctx, w, h, dpr) {
     shape(ctx, e.shape, e.r, t);
     ctx.fill(); ctx.stroke();
     ctx.restore();
+    if (e.elite && e.affix) {
+      // dashed ring, colour-coded by modifier, so the threat reads at a glance
+      const ac = AFFIX_TINT[e.affix];
+      ctx.save();
+      ctx.translate(e.x, e.y); ctx.rotate(t * 1.6);
+      ctx.strokeStyle = ac; ctx.lineWidth = 2; ctx.globalAlpha = 0.9;
+      ctx.setLineDash([5, 6]);
+      ctx.beginPath(); ctx.arc(0, 0, e.r + 8, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
     if (e.boss || e.elite) {
       const bw = e.boss ? 90 : 44, k = Math.max(0, e.hp / e.maxHp);
       ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(e.x - bw / 2, e.y - e.r - 16, bw, 5);
