@@ -64,10 +64,15 @@ const BOTS = {
 /* ------------------------------------------------------------------- picks */
 const PICKERS = {
   random: cards => cards[(Math.random() * cards.length) | 0],
+  // Funnel everything into the first weapon line to chase its evolution.
+  focused(cards) {
+    const rank = c => (c.kind === 'evo' ? 5 : c.kind === 'up' ? 4 : c.kind === 'stat' ? 2 : 1);
+    return cards.reduce((a, b) => (rank(b) > rank(a) ? b : a));
+  },
   // Breadth first (weapons beat stats), then deepen. Mirrors how people build.
   greedy(cards) {
     const owned = G.player.weapons.length;
-    const rank = c => (c.kind === 'new' && owned < 4 ? 3 : c.kind === 'up' ? 2 : c.kind === 'new' ? 1.5 : 1);
+    const rank = c => (c.kind === 'evo' ? 5 : c.kind === 'new' && owned < 4 ? 3 : c.kind === 'up' ? 2 : c.kind === 'new' ? 1.5 : 1);
     return cards.reduce((a, b) => (rank(b) > rank(a) ? b : a));
   },
 };
@@ -115,7 +120,7 @@ for (let s = 1; s <= RUNS; s++) results.push(runOne(s));
 
 const times = results.map(r => r.time);
 const levels = results.map(r => r.level);
-const survived = results.filter(r => r.time >= CAP).length;
+const survived = results.filter(r => r.time >= CAP - 0.5).length;
 
 console.log(`\n  sim: ${RUNS} runs · bot=${BOT} · picks=${PICKS} · view=${VW}x${VH} · cap=${CAP}s\n`);
 console.log(`  survival   p25 ${f1(q(times, .25))}s   median ${f1(q(times, .5))}s   p75 ${f1(q(times, .75))}s   max ${f1(Math.max(...times))}s`);

@@ -57,11 +57,13 @@ export function togglePause() {
 function showCards(cards) {
   el.cards.innerHTML = '';
   for (const c of cards) {
-    const tag = c.kind === 'new' ? '<span class="tag new">新武器</span>'
+    const tag = c.kind === 'evo' ? '<span class="tag evo">进化</span>'
+      : c.kind === 'new' ? '<span class="tag new">新武器</span>'
       : c.kind === 'up' ? '<span class="tag up">强化</span>' : '';
     const d = document.createElement('button');
-    d.className = 'card';
-    d.innerHTML = `<div class="ico">${c.icon}</div><div><h3>${c.name}${tag}</h3><p>${c.desc}</p></div>`;
+    d.className = c.kind === 'evo' ? 'card evo' : 'card';
+    const from = c.kind === 'evo' ? `<em>${WEAPONS[c.id].from}</em>` : '';
+    d.innerHTML = `<div class="ico">${c.icon}</div><div><h3>${c.name}${tag}</h3><p>${c.desc}${from}</p></div>`;
     d.addEventListener('click', () => { sfx.select(); applyCard(c); showPanel(null); syncLoadout(); });
     el.cards.appendChild(d);
   }

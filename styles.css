@@ -84,3 +84,11 @@ h2.dead{color:var(--red);text-shadow:0 0 20px rgba(255,90,110,.45)}
   border:1px solid var(--line);background:rgba(77,243,255,.05);transform:translate(-50%,-50%)}
 #joystick-knob{position:absolute;left:50%;top:50%;width:46px;height:46px;border-radius:50%;
   transform:translate(-50%,-50%);background:rgba(77,243,255,.28);border:1px solid var(--cyan)}
+
+/* evolution cards read as the run's payoff */
+.card.evo{border-color:var(--amber);background:linear-gradient(90deg,rgba(255,196,77,.16),rgba(255,77,210,.1));
+  box-shadow:0 0 24px rgba(255,196,77,.18)}
+.card.evo:hover{border-color:var(--amber);background:linear-gradient(90deg,rgba(255,196,77,.26),rgba(255,77,210,.16))}
+.card.evo .ico{background:rgba(255,196,77,.18);border-color:var(--amber)}
+.card p em{display:block;margin-top:5px;font-style:normal;font-size:10px;color:var(--amber);letter-spacing:.5px}
+.tag.evo{background:rgba(255,196,77,.25);color:var(--amber)}

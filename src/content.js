@@ -5,7 +5,8 @@ import { TAU, rand } from './util.js';
 // stats(lv) returns the numbers for that level. fire(G, w, s) spawns things.
 export const WEAPONS = {
   blaster: {
-    name: '脉冲枪', icon: '🔫', max: 6,
+    evo: { id: 'railgun', stat: 'crit' },
+    name: '脉冲枪', icon: '🔫', max: 4,
     desc: lv => `向最近敌人射出 ${1 + (lv >= 3 ? 1 : 0) + (lv >= 5 ? 1 : 0)} 发弹丸`,
     stats: lv => ({ cd: 0.58 - lv * 0.045, dmg: 14 + lv * 7, count: 1 + (lv >= 3) + (lv >= 5), pierce: lv >= 4 ? 1 : 0, speed: 560 }),
     fire(G, s) {
@@ -19,7 +20,8 @@ export const WEAPONS = {
     },
   },
   missile: {
-    name: '追踪导弹', icon: '🚀', max: 6,
+    evo: { id: 'swarm', stat: 'rate' },
+    name: '追踪导弹', icon: '🚀', max: 4,
     desc: lv => `发射 ${1 + Math.floor(lv / 2)} 枚追踪导弹，爆炸造成范围伤害`,
     stats: lv => ({ cd: 1.5 - lv * 0.1, dmg: 16 + lv * 8, count: 1 + Math.floor(lv / 2), blast: 46 + lv * 6, speed: 260 }),
     fire(G, s) {
@@ -31,7 +33,8 @@ export const WEAPONS = {
     },
   },
   laser: {
-    name: '湮灭射线', icon: '⚡', max: 6,
+    evo: { id: 'prism', stat: 'dmg' },
+    name: '湮灭射线', icon: '⚡', max: 4,
     desc: lv => `贯穿一切的高速射线，伤害 ${18 + lv * 11}`,
     stats: lv => ({ cd: 1.35 - lv * 0.09, dmg: 18 + lv * 11, pierce: 99, speed: 1500, w: 3 + lv }),
     fire(G, s) {
@@ -41,15 +44,65 @@ export const WEAPONS = {
     },
   },
   nova: {
-    name: '星爆冲击', icon: '💥', max: 6,
+    evo: { id: 'singularity', stat: 'area' },
+    name: '星爆冲击', icon: '💥', max: 4,
     desc: lv => `周期性释放冲击波，半径 ${100 + lv * 26}`,
     stats: lv => ({ cd: 3.4 - lv * 0.22, dmg: 22 + lv * 12, radius: 100 + lv * 26, knock: 220 }),
     fire(G, s) { G.novaBlast(G.player.x, G.player.y, s.radius, s.dmg, s.knock); },
   },
   orbit: {
-    name: '环卫刃', icon: '🌀', max: 6,
+    evo: { id: 'bladestorm', stat: 'speed' },
+    name: '环卫刃', icon: '🌀', max: 4,
     desc: lv => `${2 + Math.floor(lv / 2)} 把绕身飞刃，持续切割`,
     stats: lv => ({ count: 2 + Math.floor(lv / 2), dmg: 9 + lv * 6, radius: 74 + lv * 7, spin: 2.4 + lv * 0.16, r: 12 }),
+    orbital: true,
+  },
+
+  /* --- evolutions: max-level weapon + 2 picks of its paired stat --- */
+  railgun: {
+    name: '歼星炮', icon: '🌠', max: 1, evolved: true, from: '脉冲枪 + 弱点分析',
+    desc: () => '一发贯穿全场的歼星射线',
+    stats: () => ({ cd: 0.62, dmg: 130, pierce: 99, speed: 1500, w: 10 }),
+    fire(G, s) {
+      const t = G.nearestEnemy(G.player, 700, 0, true); if (!t) return;
+      const a = Math.atan2(t.y - G.player.y, t.x - G.player.x);
+      G.spawnBullet({ a, speed: s.speed, dmg: s.dmg, r: s.w, pierce: s.pierce, color: '#fff2a8', life: 0.75, beam: true });
+    },
+  },
+  swarm: {
+    name: '蜂群', icon: '🛰', max: 1, evolved: true, from: '追踪导弹 + 快速循环',
+    desc: () => '6 枚强追踪导弹齐射，大范围爆炸',
+    stats: () => ({ cd: 1.05, dmg: 64, count: 6, blast: 88, speed: 320 }),
+    fire(G, s) {
+      for (let i = 0; i < s.count; i++) {
+        const t = G.nearestEnemy(G.player, 700, i, true);
+        const a = t ? Math.atan2(t.y - G.player.y, t.x - G.player.x) + rand(0.7, -0.7) : rand(TAU);
+        G.spawnBullet({ a, speed: s.speed, dmg: s.dmg, r: 7, color: '#ffdd66', life: 3, homing: 7, blast: s.blast, trail: true });
+      }
+    },
+  },
+  prism: {
+    name: '棱镜风暴', icon: '✳', max: 1, evolved: true, from: '湮灭射线 + 能量超载',
+    desc: () => '以自身为中心射出 6 道贯穿光束',
+    stats: () => ({ cd: 0.95, dmg: 76, count: 6, speed: 1500, w: 6 }),
+    fire(G, s) {
+      const t = G.nearestEnemy(G.player, 600, 0, true);
+      const base = t ? Math.atan2(t.y - G.player.y, t.x - G.player.x) : rand(TAU);
+      for (let i = 0; i < s.count; i++) {
+        G.spawnBullet({ a: base + i * TAU / s.count, speed: s.speed, dmg: s.dmg, r: s.w, pierce: 99, color: '#ff8ae6', life: 0.5, beam: true });
+      }
+    },
+  },
+  singularity: {
+    name: '奇点', icon: '🕳', max: 1, evolved: true, from: '星爆冲击 + 场域扩张',
+    desc: () => '坍缩奇点：将敌人吸入并撕碎',
+    stats: () => ({ cd: 2.5, dmg: 120, radius: 270, knock: -300 }),
+    fire(G, s) { G.novaBlast(G.player.x, G.player.y, s.radius, s.dmg, s.knock); },
+  },
+  bladestorm: {
+    name: '环刃阵', icon: '🌪', max: 1, evolved: true, from: '环卫刃 + 推进器',
+    desc: () => '8 把高速巨刃构成的绞杀领域',
+    stats: () => ({ count: 8, dmg: 68, radius: 130, spin: 3.6, r: 17 }),
     orbital: true,
   },
 };
@@ -60,7 +113,7 @@ export const ENEMIES = {
   darter: { name: '尖啸', hp: 12, speed: 152, r: 8, dmg: 6, xp: 1, color: '#ffd24d', shape: 'diamond' },
   brute: { name: '重装', hp: 110, speed: 72, r: 20, dmg: 17, xp: 5, color: '#a77bff', shape: 'hex' },
   spitter: { name: '喷吐者', hp: 42, speed: 80, r: 13, dmg: 10, xp: 3, color: '#5cff9d', shape: 'square',
-    shoot: { cd: 2.4, speed: 190, dmg: 11, count: 1 } },
+    shoot: { cd: 2.2, speed: 205, dmg: 11, count: 1 } },
   weaver: { name: '织网者', hp: 70, speed: 112, r: 14, dmg: 11, xp: 4, color: '#4df3ff', shape: 'star', orbitStrafe: true },
   boss: { name: '母舰', hp: 900, speed: 78, r: 44, dmg: 34, xp: 90, color: '#ff4d5e', shape: 'boss', boss: true,
     shoot: { cd: 2.0, speed: 165, dmg: 16, count: 12 } },
@@ -75,6 +128,11 @@ export const SPAWN_TABLE = [
   [110, 'weaver', 4],
   [150, 'brute', 4],
   [200, 'darter', 8],
+  // Late game leans on ranged attackers: an evolved build clears its own radius,
+  // so melee chaff stops mattering and only bullets still threaten the player.
+  [210, 'spitter', 10],
+  [270, 'weaver', 10],
+  [330, 'spitter', 14],
 ];
 
 export const BOSS_INTERVAL = 90; // seconds

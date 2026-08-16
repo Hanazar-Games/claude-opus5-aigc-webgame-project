@@ -3,7 +3,7 @@ import { WEAPONS, ENEMIES, SPAWN_TABLE, BOSS_INTERVAL, STAT_UPGRADES, HEAL_CARD 
 import { sfx } from './audio.js';
 import { readMove } from './input.js';
 
-const ENEMY_CAP = 300;
+const ENEMY_CAP = 380;
 const CELL = 64;
 
 export const G = {
@@ -27,7 +27,7 @@ export function newRun() {
   G.player = {
     x: 0, y: 0, r: 13, hp: 120, maxHp: 120, speed: 178,
     damage: 1, rate: 1, armor: 1, pickup: 125, crit: 0.05, area: 1, xpMult: 1, regen: 0,
-    level: 1, xp: 0, xpNext: 5, invuln: 0, dir: -Math.PI / 2, moving: 0,
+    level: 1, xp: 0, xpNext: 5, invuln: 0, dir: -Math.PI / 2, moving: 0, picks: {},
     weapons: [{ id: 'blaster', lv: 1, t: 0, angle: 0 }],
   };
   G.state = 'playing';
@@ -111,6 +111,7 @@ G.novaBlast = (x, y, radius, dmg, knock) => {
 
 /* ------------------------------------------------------------------ combat */
 function damageEnemy(e, dmg, canCrit = true) {
+  if (e.dead) return;   // multi-hit frames (prism beams, nova) would kill it twice
   let d = dmg, crit = false;
   if (canCrit && random() < G.player.crit) { d *= 2; crit = true; }
   e.hp -= d; e.flash = 0.1;
@@ -190,8 +191,8 @@ function spawnPoint() {
 function spawnEnemy(type, at) {
   const def = ENEMIES[type];
   const t = G.time;
-  const hpMult = 1 + t / 88 + (def.boss ? (G.bossCount - 1) * 0.75 : 0);
-  const dmgMult = 1 + t / 260;
+  const hpMult = 1 + t / 80 + (t / 190) ** 2 + (def.boss ? (G.bossCount - 1) * 0.75 : 0);
+  const dmgMult = 1 + t / 200;
   const p = at || spawnPoint();
   // Elites: rare, fat, slow, worth a lot — they hand out the run's power spikes.
   const elite = !def.boss && t > 45 && random() < 0.045;
@@ -201,7 +202,7 @@ function spawnEnemy(type, at) {
     r: def.r * (elite ? 1.5 : 1),
     speed: def.speed * (1 + t / 600) * (def.boss ? 1 : rand(1.1, 0.9)) * (elite ? 0.72 : 1),
     dmg: def.dmg * dmgMult * (elite ? 1.3 : 1),
-    color: def.color, shape: def.shape, xp: def.xp * (elite ? 8 : 1),
+    color: def.color, shape: def.shape, xp: def.xp * (elite ? 8 : 1) * (1 + t / 150),
     boss: !!def.boss, elite,
     flash: 0, shootT: rand(2), orbCd: 0, wob: rand(TAU), def,
   });
@@ -424,7 +425,7 @@ function gainXp(n) {
   if (p.xp >= p.xpNext) {
     p.xp -= p.xpNext;
     p.level++;
-    p.xpNext = Math.floor(4 + p.level * 3 + p.level * p.level * 0.55);
+    p.xpNext = Math.floor(5 + p.level * 4 + p.level * p.level * 0.35);
     p.hp = Math.min(p.maxHp, p.hp + 4);
     G.state = 'levelup';
     sfx.levelup();
@@ -432,21 +433,44 @@ function gainXp(n) {
   }
 }
 
-/** Three offers: weapon level-ups, new weapons, stat mods. */
+const EVO_STAT_PICKS = 1;   // times the paired stat must be taken
+
+/** Is this owned weapon ready to evolve? */
+function evoReady(w, p, owned) {
+  const def = WEAPONS[w.id];
+  return def.evo && w.lv >= def.max
+    && (p.picks[def.evo.stat] || 0) >= EVO_STAT_PICKS
+    && !owned.has(def.evo.id);
+}
+
+/** Three offers: evolutions, weapon level-ups, new weapons, stat mods. */
 export function rollCards() {
   const p = G.player;
   const owned = new Map(p.weapons.map(w => [w.id, w]));
   const pool = [];
+
+  // Evolutions are the run's payoff — weighted high so they surface promptly.
+  for (const w of p.weapons) {
+    if (!evoReady(w, p, owned)) continue;
+    const evo = WEAPONS[w.id].evo, def = WEAPONS[evo.id];
+    pool.push({ kind: 'evo', id: evo.id, base: w.id, icon: def.icon, name: def.name, desc: def.desc(1), weight: 40 });
+  }
   for (const [id, w] of owned) {
     if (w.lv < WEAPONS[id].max)
       pool.push({ kind: 'up', id, icon: WEAPONS[id].icon, name: `${WEAPONS[id].name} Lv.${w.lv + 1}`, desc: WEAPONS[id].desc(w.lv + 1), weight: 5 });
   }
-  if (owned.size < 5)
+  if (owned.size < 4)
     for (const id of Object.keys(WEAPONS))
-      if (!owned.has(id))
+      if (!owned.has(id) && !WEAPONS[id].evolved)
         pool.push({ kind: 'new', id, icon: WEAPONS[id].icon, name: WEAPONS[id].name, desc: WEAPONS[id].desc(1), weight: 4 });
-  for (const s of STAT_UPGRADES)
-    pool.push({ kind: 'stat', id: s.id, icon: s.icon, name: s.name, desc: s.desc, weight: 3 });
+  for (const s of STAT_UPGRADES) {
+    // Nudge the stat that would unlock a pending evolution.
+    const unlocks = p.weapons.some(w => {
+      const def = WEAPONS[w.id];
+      return def.evo && def.evo.stat === s.id && w.lv >= def.max && !owned.has(def.evo.id);
+    });
+    pool.push({ kind: 'stat', id: s.id, icon: s.icon, name: s.name, desc: s.desc, weight: unlocks ? 12 : 3 });
+  }
 
   const out = [];
   const bag = pool.slice();
@@ -463,6 +487,13 @@ export function applyCard(card) {
   const p = G.player;
   if (card.kind === 'new') p.weapons.push({ id: card.id, lv: 1, t: 0, angle: 0 });
   else if (card.kind === 'up') p.weapons.find(w => w.id === card.id).lv++;
-  else (STAT_UPGRADES.find(s => s.id === card.id) || HEAL_CARD).apply(p);
+  else if (card.kind === 'evo') {
+    const slot = p.weapons.find(w => w.id === card.base);
+    slot.id = card.id; slot.lv = 1; slot.t = 0;      // evolution replaces in place
+    G.texts.push({ x: p.x, y: p.y - 46, t: 0, v: '进化！', color: '#ffc44d', big: true, life: 2 });
+  } else {
+    (STAT_UPGRADES.find(s => s.id === card.id) || HEAL_CARD).apply(p);
+    p.picks[card.id] = (p.picks[card.id] || 0) + 1;
+  }
   G.state = 'playing';
 }
