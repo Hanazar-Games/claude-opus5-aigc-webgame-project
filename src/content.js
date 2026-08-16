@@ -24,7 +24,7 @@ export const WEAPONS = {
     stats: lv => ({ cd: 1.5 - lv * 0.1, dmg: 16 + lv * 8, count: 1 + Math.floor(lv / 2), blast: 46 + lv * 6, speed: 260 }),
     fire(G, s) {
       for (let i = 0; i < s.count; i++) {
-        const t = G.nearestEnemy(G.player, 560, i);
+        const t = G.nearestEnemy(G.player, 560, i, true);
         const a = t ? Math.atan2(t.y - G.player.y, t.x - G.player.x) + rand(0.5, -0.5) : rand(TAU);
         G.spawnBullet({ a, speed: s.speed, dmg: s.dmg, r: 6, color: '#ffc44d', life: 2.4, homing: 4.5, blast: s.blast, trail: true });
       }
@@ -35,7 +35,7 @@ export const WEAPONS = {
     desc: lv => `贯穿一切的高速射线，伤害 ${18 + lv * 11}`,
     stats: lv => ({ cd: 1.35 - lv * 0.09, dmg: 18 + lv * 11, pierce: 99, speed: 1500, w: 3 + lv }),
     fire(G, s) {
-      const t = G.nearestEnemy(G.player, 480); if (!t) return;
+      const t = G.nearestEnemy(G.player, 480, 0, true); if (!t) return;
       const a = Math.atan2(t.y - G.player.y, t.x - G.player.x);
       G.spawnBullet({ a, speed: s.speed, dmg: s.dmg, r: s.w, pierce: s.pierce, color: '#ff4dd2', life: 0.42, beam: true });
     },
@@ -62,7 +62,7 @@ export const ENEMIES = {
   spitter: { name: '喷吐者', hp: 42, speed: 80, r: 13, dmg: 10, xp: 3, color: '#5cff9d', shape: 'square',
     shoot: { cd: 2.4, speed: 190, dmg: 11, count: 1 } },
   weaver: { name: '织网者', hp: 70, speed: 112, r: 14, dmg: 11, xp: 4, color: '#4df3ff', shape: 'star', orbitStrafe: true },
-  boss: { name: '母舰', hp: 1200, speed: 64, r: 44, dmg: 34, xp: 90, color: '#ff4d5e', shape: 'boss', boss: true,
+  boss: { name: '母舰', hp: 900, speed: 78, r: 44, dmg: 34, xp: 90, color: '#ff4d5e', shape: 'boss', boss: true,
     shoot: { cd: 2.0, speed: 165, dmg: 16, count: 12 } },
 };
 

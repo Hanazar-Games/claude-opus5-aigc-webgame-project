@@ -4,6 +4,7 @@ export const audio = { muted: false };
 
 function ensure() {
   if (ctx) return ctx;
+  if (typeof window === 'undefined') return null;   // headless sim
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return null;
   ctx = new AC();

@@ -1,4 +1,4 @@
-import { TAU, clamp, rand, angleTo, weightedPick } from './util.js';
+import { TAU, clamp, rand, random, angleTo, weightedPick } from './util.js';
 import { WEAPONS, ENEMIES, SPAWN_TABLE, BOSS_INTERVAL, STAT_UPGRADES, HEAL_CARD } from './content.js';
 import { sfx } from './audio.js';
 import { readMove } from './input.js';
@@ -8,9 +8,9 @@ const CELL = 64;
 
 export const G = {
   state: 'title',
-  time: 0, kills: 0, bossCount: 0,
+  time: 0, kills: 0, bossCount: 0, bossKills: 0,
   player: null,
-  enemies: [], bullets: [], ebullets: [], orbs: [], parts: [], texts: [], novas: [],
+  enemies: [], bullets: [], ebullets: [], orbs: [], pickups: [], parts: [], texts: [], novas: [],
   cam: { x: 0, y: 0, shake: 0 },
   view: { w: 800, h: 600 },
   spawnAcc: 0, nextBoss: BOSS_INTERVAL,
@@ -20,9 +20,9 @@ export const G = {
 
 /* ------------------------------------------------------------------- setup */
 export function newRun() {
-  G.time = 0; G.kills = 0; G.bossCount = 0; G.spawnAcc = 0; G.nextBoss = BOSS_INTERVAL;
+  G.time = 0; G.kills = 0; G.bossCount = 0; G.bossKills = 0; G.spawnAcc = 0; G.nextBoss = BOSS_INTERVAL;
   G.enemies.length = G.bullets.length = G.ebullets.length = 0;
-  G.orbs.length = G.parts.length = G.texts.length = G.novas.length = 0;
+  G.orbs.length = G.pickups.length = G.parts.length = G.texts.length = G.novas.length = 0;
   G.cam.x = G.cam.y = 0; G.cam.shake = 0;
   G.player = {
     x: 0, y: 0, r: 13, hp: 120, maxHp: 120, speed: 178,
@@ -55,8 +55,23 @@ function queryGrid(x, y, r, out) {
 const _q = [];
 
 /* --------------------------------------------------------------- API hooks */
-G.nearestEnemy = (from, maxD = 900, idx = 0) => {
+/**
+ * Target acquisition. `prefer` makes a weapon lock onto a boss in range instead
+ * of the nearest body — without it, single-target weapons spend the whole boss
+ * fight chewing on the chaff swarming between the player and the boss, and the
+ * boss can never be killed.
+ */
+G.nearestEnemy = (from, maxD = 900, idx = 0, prefer = false) => {
   const md2 = maxD * maxD;
+  if (prefer) {
+    let bb = null, bbd = Infinity;
+    for (const e of G.enemies) {
+      if (!e.boss) continue;
+      const d = (e.x - from.x) ** 2 + (e.y - from.y) ** 2;
+      if (d <= md2 && d < bbd) { bbd = d; bb = e; }
+    }
+    if (bb) return bb;
+  }
   let best = null, bd = Infinity;
   const cands = idx > 0 ? [] : null;
   for (const e of G.enemies) {
@@ -97,21 +112,51 @@ G.novaBlast = (x, y, radius, dmg, knock) => {
 /* ------------------------------------------------------------------ combat */
 function damageEnemy(e, dmg, canCrit = true) {
   let d = dmg, crit = false;
-  if (canCrit && Math.random() < G.player.crit) { d *= 2; crit = true; }
+  if (canCrit && random() < G.player.crit) { d *= 2; crit = true; }
   e.hp -= d; e.flash = 0.1;
   if (crit) G.texts.push({ x: e.x, y: e.y - e.r, t: 0, v: Math.round(d), color: '#ffc44d' });
   if (e.hp <= 0) killEnemy(e);
-  else if (Math.random() < 0.35) sfx.hit();
+  else if (random() < 0.35) sfx.hit();
 }
 
 function killEnemy(e) {
   e.dead = true;
   G.kills++;
-  burst(e.x, e.y, e.color, e.boss ? 40 : 8, e.boss ? 260 : 150);
-  const n = e.boss ? 14 : 1;
+  burst(e.x, e.y, e.color, e.boss ? 40 : e.elite ? 20 : 8, e.boss ? 260 : 150);
+  const n = e.boss ? 14 : e.elite ? 5 : 1;
   for (let i = 0; i < n; i++)
-    G.orbs.push({ x: e.x + rand(20, -20), y: e.y + rand(20, -20), vx: rand(60, -60), vy: rand(60, -60), xp: e.xp / n, r: 5 });
-  if (e.boss) { G.cam.shake = 18; sfx.boss(); } else sfx.kill();
+    G.orbs.push({ x: e.x + rand(20, -20), y: e.y + rand(20, -20), vx: rand(60, -60), vy: rand(60, -60), xp: e.xp / n, r: e.elite || e.boss ? 7 : 5 });
+  if (e.boss) {
+    G.bossKills++; G.cam.shake = 18; sfx.boss();
+    dropPickup(e.x, e.y, 'heal'); dropPickup(e.x + 40, e.y, 'bomb');
+    G.texts.push({ x: e.x, y: e.y - 40, t: 0, v: '母舰击破', color: '#5cff9d', big: true, life: 2 });
+  } else {
+    sfx.kill();
+    if (e.elite) dropPickup(e.x, e.y, weightedPick(DROPS).kind);
+  }
+}
+
+const DROPS = [{ kind: 'heal', weight: 5 }, { kind: 'magnet', weight: 3 }, { kind: 'bomb', weight: 3 }];
+
+function dropPickup(x, y, kind) {
+  G.pickups.push({ x, y, kind, r: 11, t: 0 });
+}
+
+function collectPickup(pk) {
+  const p = G.player;
+  pk.got = true;
+  sfx.levelup();
+  if (pk.kind === 'heal') {
+    p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.3);
+    G.texts.push({ x: p.x, y: p.y - 30, t: 0, v: '+HP', color: '#5cff9d' });
+  } else if (pk.kind === 'magnet') {
+    for (const o of G.orbs) o.age = 99;               // every orb homes in
+    G.texts.push({ x: p.x, y: p.y - 30, t: 0, v: '磁暴', color: '#4df3ff' });
+  } else {
+    G.novaBlast(p.x, p.y, 620, 90 + p.level * 22, 340);
+    G.cam.shake = 22;
+    G.texts.push({ x: p.x, y: p.y - 30, t: 0, v: '轨道打击', color: '#ffc44d' });
+  }
 }
 
 function hurtPlayer(dmg) {
@@ -145,14 +190,19 @@ function spawnPoint() {
 function spawnEnemy(type, at) {
   const def = ENEMIES[type];
   const t = G.time;
-  const hpMult = 1 + t / 88 + (def.boss ? G.bossCount * 1.1 : 0);
+  const hpMult = 1 + t / 88 + (def.boss ? (G.bossCount - 1) * 0.75 : 0);
   const dmgMult = 1 + t / 260;
   const p = at || spawnPoint();
-  const hp = def.hp * hpMult;
+  // Elites: rare, fat, slow, worth a lot — they hand out the run's power spikes.
+  const elite = !def.boss && t > 45 && random() < 0.045;
+  const hp = def.hp * hpMult * (elite ? 4 : 1);
   G.enemies.push({
     type, x: p.x, y: p.y, vx: 0, vy: 0, hp, maxHp: hp,
-    r: def.r, speed: def.speed * (1 + t / 600) * (def.boss ? 1 : rand(1.1, 0.9)), dmg: def.dmg * dmgMult,
-    color: def.color, shape: def.shape, xp: def.xp, boss: !!def.boss,
+    r: def.r * (elite ? 1.5 : 1),
+    speed: def.speed * (1 + t / 600) * (def.boss ? 1 : rand(1.1, 0.9)) * (elite ? 0.72 : 1),
+    dmg: def.dmg * dmgMult * (elite ? 1.3 : 1),
+    color: def.color, shape: def.shape, xp: def.xp * (elite ? 8 : 1),
+    boss: !!def.boss, elite,
     flash: 0, shootT: rand(2), orbCd: 0, wob: rand(TAU), def,
   });
 }
@@ -165,7 +215,8 @@ function director(dt) {
     G.texts.push({ x: G.player.x, y: G.player.y - 70, t: 0, v: '母舰逼近', color: '#ff4d5e', big: true, life: 2.4 });
     sfx.boss();
   }
-  const rate = 0.45 + t / 34;                  // enemies per second
+  const bossFight = G.enemies.some(e => e.boss);
+  const rate = (0.45 + t / 34) * (bossFight ? 0.5 : 1);   // ease the chaff during a boss
   G.spawnAcc += dt * rate;
   const table = SPAWN_TABLE.filter(r => t >= r[0]).map(r => ({ type: r[1], weight: r[2] }));
   while (G.spawnAcc >= 1) {
@@ -174,7 +225,7 @@ function director(dt) {
     spawnEnemy(weightedPick(table).type);
   }
   // occasional tight cluster for pressure
-  if (t > 55 && Math.random() < dt * 0.12 && G.enemies.length < ENEMY_CAP - 20) {
+  if (t > 55 && random() < dt * 0.12 && G.enemies.length < ENEMY_CAP - 20) {
     const c = spawnPoint(), type = weightedPick(table).type;
     for (let i = 0; i < 10; i++) spawnEnemy(type, { x: c.x + rand(70, -70), y: c.y + rand(70, -70) });
   }
@@ -294,6 +345,14 @@ export function update(dt) {
     if (d < 24) { o.got = true; gainXp(o.xp * p.xpMult); }
   }
 
+  /* pickups */
+  for (const pk of G.pickups) {
+    pk.t += dt;
+    const dx = p.x - pk.x, dy = p.y - pk.y, d = Math.hypot(dx, dy) || 1;
+    if (d < pr) { const sp = 240 + (1 - d / pr) * 500; pk.x += dx / d * sp * dt; pk.y += dy / d * sp * dt; }
+    if (d < 28) collectPickup(pk);
+  }
+
   /* fx */
   for (const q of G.parts) { q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.93; q.vy *= 0.93; }
   for (const n of G.novas) n.t += dt;
@@ -351,6 +410,7 @@ function prune() {
   G.bullets = G.bullets.filter(b => b.life > 0);
   G.ebullets = G.ebullets.filter(b => b.life > 0);
   G.orbs = G.orbs.filter(o => !o.got);
+  G.pickups = G.pickups.filter(pk => !pk.got);
   G.parts = G.parts.filter(q => q.life > 0);
   G.novas = G.novas.filter(n => n.t < n.dur);
   G.texts = G.texts.filter(t => t.t < (t.life || 0.9));

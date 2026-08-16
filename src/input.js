@@ -8,8 +8,11 @@ const KEY_MAP = {
 export const input = { x: 0, y: 0, onPause: null };
 const held = new Set();
 
-const jsEl = document.getElementById('joystick');
-const knob = document.getElementById('joystick-knob');
+// Headless (tools/sim.mjs) imports this module without a DOM; the sim drives
+// `input.x/y` directly and never calls initInput().
+const hasDOM = typeof document !== 'undefined';
+const jsEl = hasDOM ? document.getElementById('joystick') : null;
+const knob = hasDOM ? document.getElementById('joystick-knob') : null;
 let touchId = null, ox = 0, oy = 0;
 const RADIUS = 46;
 

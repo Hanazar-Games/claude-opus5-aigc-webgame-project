@@ -15,7 +15,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  balance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Headless balance sim
+        run: node tools/sim.mjs --runs 16 --assert-min 90 --assert-max 420
+
   deploy:
+    needs: balance
     runs-on: ubuntu-latest
     environment:
       name: github-pages

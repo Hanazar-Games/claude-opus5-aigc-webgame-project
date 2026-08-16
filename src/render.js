@@ -1,4 +1,4 @@
-import { TAU, rand } from './util.js';
+import { TAU, rand, clamp } from './util.js';
 import { G } from './game.js';
 import { WEAPONS } from './content.js';
 
@@ -89,6 +89,24 @@ export function render(ctx, w, h, dpr) {
   for (const o of G.orbs) { ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, TAU); ctx.fill(); }
   ctx.shadowBlur = 0;
 
+  /* pickups */
+  for (const pk of G.pickups) {
+    const c = pk.kind === 'heal' ? '#5cff9d' : pk.kind === 'magnet' ? '#4df3ff' : '#ffc44d';
+    const pulse = 1 + Math.sin(pk.t * 7) * 0.12;
+    ctx.save();
+    ctx.translate(pk.x, pk.y);
+    ctx.scale(pulse, pulse);
+    ctx.shadowBlur = 16; ctx.shadowColor = c;
+    ctx.strokeStyle = c; ctx.fillStyle = c + '2e'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, pk.r, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = c;
+    if (pk.kind === 'heal') { ctx.fillRect(-5, -1.6, 10, 3.2); ctx.fillRect(-1.6, -5, 3.2, 10); }
+    else if (pk.kind === 'magnet') { ctx.fillRect(-5, -4, 3, 8); ctx.fillRect(2, -4, 3, 8); ctx.fillRect(-5, -5, 10, 3); }
+    else { for (let i = 0; i < 6; i++) { const a = i * TAU / 6; ctx.fillRect(Math.cos(a) * 4 - 1, Math.sin(a) * 4 - 1, 2.4, 2.4); } }
+    ctx.restore();
+  }
+  ctx.shadowBlur = 0;
+
   /* enemies */
   for (const e of G.enemies) {
     ctx.save();
@@ -96,16 +114,16 @@ export function render(ctx, w, h, dpr) {
     ctx.rotate(Math.atan2(e.vy, e.vx));
     const flash = e.flash > 0;
     ctx.fillStyle = flash ? '#ffffff' : e.color + '33';
-    ctx.strokeStyle = flash ? '#ffffff' : e.color;
-    ctx.lineWidth = e.boss ? 3 : 2;
-    if (e.boss) { ctx.shadowBlur = 24; ctx.shadowColor = e.color; }
+    ctx.strokeStyle = flash ? '#ffffff' : e.elite ? '#ffd24d' : e.color;
+    ctx.lineWidth = e.boss ? 3 : e.elite ? 3 : 2;
+    if (e.boss || e.elite) { ctx.shadowBlur = e.boss ? 24 : 14; ctx.shadowColor = e.elite ? '#ffd24d' : e.color; }
     shape(ctx, e.shape, e.r, t);
     ctx.fill(); ctx.stroke();
     ctx.restore();
-    if (e.boss) {
-      const bw = 90, k = Math.max(0, e.hp / e.maxHp);
+    if (e.boss || e.elite) {
+      const bw = e.boss ? 90 : 44, k = Math.max(0, e.hp / e.maxHp);
       ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(e.x - bw / 2, e.y - e.r - 16, bw, 5);
-      ctx.fillStyle = '#ff4d5e'; ctx.fillRect(e.x - bw / 2, e.y - e.r - 16, bw * k, 5);
+      ctx.fillStyle = e.boss ? '#ff4d5e' : '#ffd24d'; ctx.fillRect(e.x - bw / 2, e.y - e.r - 16, bw * k, 5);
     }
   }
   ctx.shadowBlur = 0;
@@ -198,6 +216,23 @@ export function render(ctx, w, h, dpr) {
   }
   ctx.globalAlpha = 1;
   ctx.restore();
+
+  /* off-screen markers for things worth walking toward */
+  const M = 26;
+  const marker = (wx, wy, color) => {
+    let sx2 = wx - cam.x + w / 2, sy2 = wy - cam.y + h / 2;
+    if (sx2 > M && sx2 < w - M && sy2 > M && sy2 < h - M) return;
+    const cx = clamp(sx2, M, w - M), cy = clamp(sy2, M, h - M);
+    const a = Math.atan2(sy2 - h / 2, sx2 - w / 2);
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(a);
+    ctx.fillStyle = color; ctx.globalAlpha = 0.85;
+    ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-6, 6); ctx.lineTo(-6, -6); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  };
+  for (const e of G.enemies) if (e.boss) marker(e.x, e.y, '#ff4d5e'); else if (e.elite) marker(e.x, e.y, '#ffd24d');
+  for (const pk of G.pickups) marker(pk.x, pk.y, pk.kind === 'heal' ? '#5cff9d' : pk.kind === 'magnet' ? '#4df3ff' : '#ffc44d');
+  ctx.globalAlpha = 1;
 
   /* low-hp vignette */
   const hpk = p.hp / p.maxHp;
