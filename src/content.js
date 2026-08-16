@@ -6,8 +6,8 @@ import { TAU, rand } from './util.js';
 export const WEAPONS = {
   blaster: {
     evo: { id: 'railgun', stat: 'crit' },
-    name: '脉冲枪', icon: '🔫', max: 4,
-    desc: lv => `向最近敌人射出 ${1 + (lv >= 3 ? 1 : 0) + (lv >= 5 ? 1 : 0)} 发弹丸`,
+    name: 'Pulse Gun', icon: '🔫', max: 4,
+    desc: lv => `Fires ${1 + (lv >= 3 ? 1 : 0) + (lv >= 5 ? 1 : 0)} bolt(s) at the nearest target`,
     stats: lv => ({ cd: 0.58 - lv * 0.045, dmg: 14 + lv * 7, count: 1 + (lv >= 3) + (lv >= 5), pierce: lv >= 4 ? 1 : 0, speed: 560 }),
     fire(G, s) {
       const t = G.nearestEnemy(G.player, 400); if (!t) return;
@@ -21,8 +21,8 @@ export const WEAPONS = {
   },
   missile: {
     evo: { id: 'swarm', stat: 'rate' },
-    name: '追踪导弹', icon: '🚀', max: 4,
-    desc: lv => `发射 ${1 + Math.floor(lv / 2)} 枚追踪导弹，爆炸造成范围伤害`,
+    name: 'Seeker Missiles', icon: '🚀', max: 4,
+    desc: lv => `Launches ${1 + Math.floor(lv / 2)} homing missile(s) that blast on impact`,
     stats: lv => ({ cd: 1.5 - lv * 0.1, dmg: 16 + lv * 8, count: 1 + Math.floor(lv / 2), blast: 46 + lv * 6, speed: 260 }),
     fire(G, s) {
       for (let i = 0; i < s.count; i++) {
@@ -34,8 +34,8 @@ export const WEAPONS = {
   },
   laser: {
     evo: { id: 'prism', stat: 'dmg' },
-    name: '湮灭射线', icon: '⚡', max: 4,
-    desc: lv => `贯穿一切的高速射线，伤害 ${18 + lv * 11}`,
+    name: 'Annihilation Beam', icon: '⚡', max: 4,
+    desc: lv => `A piercing beam that cuts through everything · ${18 + lv * 11} dmg`,
     stats: lv => ({ cd: 1.35 - lv * 0.09, dmg: 18 + lv * 11, pierce: 99, speed: 1500, w: 3 + lv }),
     fire(G, s) {
       const t = G.nearestEnemy(G.player, 480, 0, true); if (!t) return;
@@ -45,23 +45,23 @@ export const WEAPONS = {
   },
   nova: {
     evo: { id: 'singularity', stat: 'area' },
-    name: '星爆冲击', icon: '💥', max: 4,
-    desc: lv => `周期性释放冲击波，半径 ${100 + lv * 26}`,
+    name: 'Starburst', icon: '💥', max: 4,
+    desc: lv => `Periodic shockwave that knocks enemies back · radius ${100 + lv * 26}`,
     stats: lv => ({ cd: 3.4 - lv * 0.22, dmg: 22 + lv * 12, radius: 100 + lv * 26, knock: 220 }),
     fire(G, s) { G.novaBlast(G.player.x, G.player.y, s.radius, s.dmg, s.knock); },
   },
   orbit: {
     evo: { id: 'bladestorm', stat: 'speed' },
-    name: '环卫刃', icon: '🌀', max: 4,
-    desc: lv => `${2 + Math.floor(lv / 2)} 把绕身飞刃，持续切割`,
+    name: 'Orbit Blades', icon: '🌀', max: 4,
+    desc: lv => `${2 + Math.floor(lv / 2)} blades circling you, shredding anything close`,
     stats: lv => ({ count: 2 + Math.floor(lv / 2), dmg: 9 + lv * 6, radius: 74 + lv * 7, spin: 2.4 + lv * 0.16, r: 12 }),
     orbital: true,
   },
 
   /* --- evolutions: max-level weapon + 2 picks of its paired stat --- */
   railgun: {
-    name: '歼星炮', icon: '🌠', max: 1, evolved: true, from: '脉冲枪 + 弱点分析',
-    desc: () => '一发贯穿全场的歼星射线',
+    name: 'Starbreaker', icon: '🌠', max: 1, evolved: true, from: 'Pulse Gun + Weak Point Analysis',
+    desc: () => 'One shot that tears through the entire field',
     stats: () => ({ cd: 0.62, dmg: 130, pierce: 99, speed: 1500, w: 10 }),
     fire(G, s) {
       const t = G.nearestEnemy(G.player, 700, 0, true); if (!t) return;
@@ -70,8 +70,8 @@ export const WEAPONS = {
     },
   },
   swarm: {
-    name: '蜂群', icon: '🛰', max: 1, evolved: true, from: '追踪导弹 + 快速循环',
-    desc: () => '6 枚强追踪导弹齐射，大范围爆炸',
+    name: 'Hive', icon: '🛰', max: 1, evolved: true, from: 'Seeker Missiles + Rapid Cycling',
+    desc: () => 'Six hard-locking missiles per volley, wide blast',
     stats: () => ({ cd: 1.05, dmg: 64, count: 6, blast: 88, speed: 320 }),
     fire(G, s) {
       for (let i = 0; i < s.count; i++) {
@@ -82,8 +82,8 @@ export const WEAPONS = {
     },
   },
   prism: {
-    name: '棱镜风暴', icon: '✳', max: 1, evolved: true, from: '湮灭射线 + 能量超载',
-    desc: () => '以自身为中心射出 6 道贯穿光束',
+    name: 'Prism Storm', icon: '✳', max: 1, evolved: true, from: 'Annihilation Beam + Overload',
+    desc: () => 'Six piercing beams radiating out from you',
     stats: () => ({ cd: 0.95, dmg: 76, count: 6, speed: 1500, w: 6 }),
     fire(G, s) {
       const t = G.nearestEnemy(G.player, 600, 0, true);
@@ -94,14 +94,14 @@ export const WEAPONS = {
     },
   },
   singularity: {
-    name: '奇点', icon: '🕳', max: 1, evolved: true, from: '星爆冲击 + 场域扩张',
-    desc: () => '坍缩奇点：将敌人吸入并撕碎',
+    name: 'Singularity', icon: '🕳', max: 1, evolved: true, from: 'Starburst + Field Expansion',
+    desc: () => 'Collapses space, dragging enemies in and shredding them',
     stats: () => ({ cd: 2.5, dmg: 120, radius: 270, knock: -300 }),
     fire(G, s) { G.novaBlast(G.player.x, G.player.y, s.radius, s.dmg, s.knock); },
   },
   bladestorm: {
-    name: '环刃阵', icon: '🌪', max: 1, evolved: true, from: '环卫刃 + 推进器',
-    desc: () => '8 把高速巨刃构成的绞杀领域',
+    name: 'Bladestorm', icon: '🌪', max: 1, evolved: true, from: 'Orbit Blades + Thrusters',
+    desc: () => 'Eight massive blades forming a kill zone',
     stats: () => ({ count: 8, dmg: 68, radius: 130, spin: 3.6, r: 17 }),
     orbital: true,
   },
@@ -109,13 +109,13 @@ export const WEAPONS = {
 
 /* ------------------------------------------------------------------ enemies */
 export const ENEMIES = {
-  drone: { name: '游荡者', hp: 20, speed: 96, r: 11, dmg: 7, xp: 1, color: '#ff7ba8', shape: 'tri' },
-  darter: { name: '尖啸', hp: 12, speed: 152, r: 8, dmg: 6, xp: 1, color: '#ffd24d', shape: 'diamond' },
-  brute: { name: '重装', hp: 110, speed: 72, r: 20, dmg: 17, xp: 5, color: '#a77bff', shape: 'hex' },
-  spitter: { name: '喷吐者', hp: 42, speed: 80, r: 13, dmg: 10, xp: 3, color: '#5cff9d', shape: 'square',
+  drone: { name: 'Drifter', hp: 20, speed: 96, r: 11, dmg: 7, xp: 1, color: '#ff7ba8', shape: 'tri' },
+  darter: { name: 'Shrieker', hp: 12, speed: 152, r: 8, dmg: 6, xp: 1, color: '#ffd24d', shape: 'diamond' },
+  brute: { name: 'Bulwark', hp: 110, speed: 72, r: 20, dmg: 17, xp: 5, color: '#a77bff', shape: 'hex' },
+  spitter: { name: 'Spitter', hp: 42, speed: 80, r: 13, dmg: 10, xp: 3, color: '#5cff9d', shape: 'square',
     shoot: { cd: 2.2, speed: 205, dmg: 11, count: 1 } },
-  weaver: { name: '织网者', hp: 70, speed: 112, r: 14, dmg: 11, xp: 4, color: '#4df3ff', shape: 'star', orbitStrafe: true },
-  boss: { name: '母舰', hp: 900, speed: 78, r: 44, dmg: 34, xp: 90, color: '#ff4d5e', shape: 'boss', boss: true,
+  weaver: { name: 'Weaver', hp: 70, speed: 112, r: 14, dmg: 11, xp: 4, color: '#4df3ff', shape: 'star', orbitStrafe: true },
+  boss: { name: 'Mothership', hp: 900, speed: 78, r: 44, dmg: 34, xp: 90, color: '#ff4d5e', shape: 'boss', boss: true,
     shoot: { cd: 2.0, speed: 165, dmg: 16, count: 12 } },
 };
 
@@ -139,16 +139,16 @@ export const BOSS_INTERVAL = 90; // seconds
 
 /* ----------------------------------------------------------------- upgrades */
 export const STAT_UPGRADES = [
-  { id: 'dmg', icon: '🗡', name: '能量超载', desc: '所有伤害 +15%', apply: p => p.damage *= 1.15 },
-  { id: 'rate', icon: '⏱', name: '快速循环', desc: '攻击间隔 -11%', apply: p => p.rate *= 0.89 },
-  { id: 'speed', icon: '👟', name: '推进器', desc: '移动速度 +11%', apply: p => p.speed *= 1.11 },
-  { id: 'hp', icon: '❤', name: '装甲增幅', desc: '最大生命 +25 并治疗', apply: p => { p.maxHp += 25; p.hp += 25; } },
-  { id: 'regen', icon: '✚', name: '纳米修复', desc: '每秒回复 +0.6 生命', apply: p => p.regen += 0.6 },
-  { id: 'armor', icon: '🛡', name: '偏导护盾', desc: '受到伤害 -12%', apply: p => p.armor *= 0.88 },
-  { id: 'pickup', icon: '🧲', name: '磁力线圈', desc: '拾取范围 +35%', apply: p => p.pickup *= 1.35 },
-  { id: 'crit', icon: '🎯', name: '弱点分析', desc: '暴击率 +8%（2 倍伤害）', apply: p => p.crit += 0.08 },
-  { id: 'area', icon: '🌐', name: '场域扩张', desc: '范围效果 +14%', apply: p => p.area *= 1.14 },
-  { id: 'xp', icon: '⭐', name: '数据挖掘', desc: '经验获取 +18%', apply: p => p.xpMult *= 1.18 },
+  { id: 'dmg', icon: '🗡', name: 'Overload', desc: '+15% damage to everything', apply: p => p.damage *= 1.15 },
+  { id: 'rate', icon: '⏱', name: 'Rapid Cycling', desc: '-11% time between attacks', apply: p => p.rate *= 0.89 },
+  { id: 'speed', icon: '👟', name: 'Thrusters', desc: '+11% movement speed', apply: p => p.speed *= 1.11 },
+  { id: 'hp', icon: '❤', name: 'Plating', desc: '+25 max HP, and heal for it', apply: p => { p.maxHp += 25; p.hp += 25; } },
+  { id: 'regen', icon: '✚', name: 'Nanorepair', desc: 'Regenerate +0.6 HP per second', apply: p => p.regen += 0.6 },
+  { id: 'armor', icon: '🛡', name: 'Deflectors', desc: '-12% damage taken', apply: p => p.armor *= 0.88 },
+  { id: 'pickup', icon: '🧲', name: 'Mag Coil', desc: '+35% pickup range', apply: p => p.pickup *= 1.35 },
+  { id: 'crit', icon: '🎯', name: 'Weak Point Analysis', desc: '+8% crit chance (double damage)', apply: p => p.crit += 0.08 },
+  { id: 'area', icon: '🌐', name: 'Field Expansion', desc: '+14% area of effect', apply: p => p.area *= 1.14 },
+  { id: 'xp', icon: '⭐', name: 'Data Mining', desc: '+18% XP gained', apply: p => p.xpMult *= 1.18 },
 ];
 
-export const HEAL_CARD = { id: 'heal', icon: '🍀', name: '应急补给', desc: '立即回复 40% 生命', apply: p => { p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.4); } };
+export const HEAL_CARD = { id: 'heal', icon: '🍀', name: 'Emergency Supply', desc: 'Instantly restore 40% HP', apply: p => { p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.4); } };

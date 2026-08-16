@@ -57,9 +57,9 @@ export function togglePause() {
 function showCards(cards) {
   el.cards.innerHTML = '';
   for (const c of cards) {
-    const tag = c.kind === 'evo' ? '<span class="tag evo">进化</span>'
-      : c.kind === 'new' ? '<span class="tag new">新武器</span>'
-      : c.kind === 'up' ? '<span class="tag up">强化</span>' : '';
+    const tag = c.kind === 'evo' ? '<span class="tag evo">EVOLVE</span>'
+      : c.kind === 'new' ? '<span class="tag new">NEW</span>'
+      : c.kind === 'up' ? '<span class="tag up">UPGRADE</span>' : '';
     const d = document.createElement('button');
     d.className = c.kind === 'evo' ? 'card evo' : 'card';
     const from = c.kind === 'evo' ? `<em>${WEAPONS[c.id].from}</em>` : '';
@@ -76,7 +76,7 @@ function showGameOver() {
   $('r-level').textContent = G.player.level;
   const isBest = G.time > (best.time || 0);
   if (isBest) { best.time = G.time; best.kills = G.kills; best.level = G.player.level; saveBest(); }
-  $('r-best').textContent = isBest ? '★ 新纪录！' : `最佳纪录：${fmtTime(best.time)}`;
+  $('r-best').textContent = isBest ? '★ NEW RECORD' : `Best: ${fmtTime(best.time)}`;
   $('best-title').textContent = best.time ? `${fmtTime(best.time)} · ☠${best.kills}` : '--';
   setTimeout(() => showPanel('over'), 700);
 }

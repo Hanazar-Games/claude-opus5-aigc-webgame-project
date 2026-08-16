@@ -130,7 +130,7 @@ function killEnemy(e) {
   if (e.boss) {
     G.bossKills++; G.cam.shake = 18; sfx.boss();
     dropPickup(e.x, e.y, 'heal'); dropPickup(e.x + 40, e.y, 'bomb');
-    G.texts.push({ x: e.x, y: e.y - 40, t: 0, v: '母舰击破', color: '#5cff9d', big: true, life: 2 });
+    G.texts.push({ x: e.x, y: e.y - 40, t: 0, v: 'MOTHERSHIP DOWN', color: '#5cff9d', big: true, life: 2 });
   } else {
     sfx.kill();
     if (e.elite) dropPickup(e.x, e.y, weightedPick(DROPS).kind);
@@ -152,11 +152,11 @@ function collectPickup(pk) {
     G.texts.push({ x: p.x, y: p.y - 30, t: 0, v: '+HP', color: '#5cff9d' });
   } else if (pk.kind === 'magnet') {
     for (const o of G.orbs) o.age = 99;               // every orb homes in
-    G.texts.push({ x: p.x, y: p.y - 30, t: 0, v: '磁暴', color: '#4df3ff' });
+    G.texts.push({ x: p.x, y: p.y - 30, t: 0, v: 'MAGNET', color: '#4df3ff' });
   } else {
     G.novaBlast(p.x, p.y, 620, 90 + p.level * 22, 340);
     G.cam.shake = 22;
-    G.texts.push({ x: p.x, y: p.y - 30, t: 0, v: '轨道打击', color: '#ffc44d' });
+    G.texts.push({ x: p.x, y: p.y - 30, t: 0, v: 'ORBITAL STRIKE', color: '#ffc44d' });
   }
 }
 
@@ -213,7 +213,7 @@ function director(dt) {
   if (t >= G.nextBoss) {
     G.nextBoss += BOSS_INTERVAL; G.bossCount++;
     spawnEnemy('boss');
-    G.texts.push({ x: G.player.x, y: G.player.y - 70, t: 0, v: '母舰逼近', color: '#ff4d5e', big: true, life: 2.4 });
+    G.texts.push({ x: G.player.x, y: G.player.y - 70, t: 0, v: 'MOTHERSHIP INBOUND', color: '#ff4d5e', big: true, life: 2.4 });
     sfx.boss();
   }
   const bossFight = G.enemies.some(e => e.boss);
@@ -490,7 +490,7 @@ export function applyCard(card) {
   else if (card.kind === 'evo') {
     const slot = p.weapons.find(w => w.id === card.base);
     slot.id = card.id; slot.lv = 1; slot.t = 0;      // evolution replaces in place
-    G.texts.push({ x: p.x, y: p.y - 46, t: 0, v: '进化！', color: '#ffc44d', big: true, life: 2 });
+    G.texts.push({ x: p.x, y: p.y - 46, t: 0, v: 'EVOLVED!', color: '#ffc44d', big: true, life: 2 });
   } else {
     (STAT_UPGRADES.find(s => s.id === card.id) || HEAL_CARD).apply(p);
     p.picks[card.id] = (p.picks[card.id] || 0) + 1;

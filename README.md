@@ -1,85 +1,92 @@
-# 星海拾荒者 · Starfall Scavenger
+# Starfall Scavenger
 
-一款纯前端的霓虹幸存者类 Roguelite 网页游戏。无构建步骤、无第三方依赖、无美术资源——
-全部图形由 Canvas 2D 绘制，音效由 WebAudio 实时合成。
+A neon roguelite survivors game that runs entirely in the browser. No build step,
+no dependencies, no art assets — every shape is drawn with Canvas 2D and every
+sound is synthesised at runtime with WebAudio.
 
-**▶ 在线游玩：https://hanazar-games.github.io/claude-opus5-aigc-webgame-project/**
+**▶ Play: https://hanazar-games.github.io/claude-opus5-aigc-webgame-project/**
 
-## 玩法
+## How to play
 
-- **移动**：`WASD` / 方向键；触屏在任意位置按下拖动即为虚拟摇杆
-- **开火**：全自动。多数武器打最近的敌人，追踪导弹与射线会优先锁定母舰
-- **成长**：击杀掉落星尘，拾取升级，每级从 3 张卡中三选一
-- **暂停**：`P` / `Esc` / 右下角按钮
-- 每 90 秒降临一次**母舰**，越往后敌人越快、越硬、越多
-- **精英怪**（金色描边）血厚移动慢，但给 8 倍经验并必定掉落道具
-- **道具**：✚ 治疗 · 磁暴（吸取全场星尘）· 轨道打击（全屏爆发）
-- 母舰与精英在屏幕外时，边缘会有箭头指示方向
+- **Move** — `WASD` / arrow keys, or drag anywhere on a touch screen for a virtual stick
+- **Shoot** — automatic. Most weapons hit the nearest enemy; missiles and beams prioritise the Mothership
+- **Grow** — kills drop stardust; collect it to level up and pick 1 of 3 cards
+- **Pause** — `P` / `Esc` / the button in the corner
+- A **Mothership** arrives every 90 seconds. Enemies get faster, tougher and denser as you survive
+- **Elites** (gold outline) are slow and tanky but worth 8× XP and always drop an item
+- **Items** — ✚ Heal · Magnet (pulls in every orb on the field) · Orbital Strike (screen-wide blast)
+- Off-screen Motherships, elites and items are flagged by arrows at the screen edge
 
-### 武器
+### Weapons
 
-| 武器 | 说明 |
+| Weapon | Behaviour |
 | --- | --- |
-| 🔫 脉冲枪 | 起手武器，射向最近敌人，高等级分裂多发并穿透 |
-| 🚀 追踪导弹 | 追踪目标，命中后爆炸造成范围伤害 |
-| ⚡ 湮灭射线 | 高速贯穿射线，无视数量 |
-| 💥 星爆冲击 | 周期性以自身为中心释放冲击波并击退 |
-| 🌀 环卫刃 | 绕身旋转的飞刃，持续切割贴身敌人 |
+| 🔫 Pulse Gun | Starting weapon. Fires at the nearest target; splits and pierces at higher levels |
+| 🚀 Seeker Missiles | Home in on targets and blast on impact |
+| ⚡ Annihilation Beam | High-speed beam that pierces everything in a line |
+| 💥 Starburst | Periodic shockwave centred on you, knocking enemies back |
+| 🌀 Orbit Blades | Blades circling you, shredding anything that gets close |
 
-### 武器进化
+### Evolutions
 
-武器升满（Lv.4）后再取到它的**配对词条**，升级卡池就会出现金色的进化卡——
-进化后的武器原地替换，强度是一个台阶的跃迁。集中培养一条线比雨露均沾更强。
+Max a weapon (Lv.4), then take its **paired stat** — a gold evolution card enters
+the pool. Evolving replaces the weapon in place with a step-change upgrade.
+Funnelling one line beats spreading yourself thin.
 
-| 进化 | 配方 | 效果 |
+| Evolution | Recipe | Effect |
 | --- | --- | --- |
-| 🌠 歼星炮 | 脉冲枪 + 弱点分析 | 一发贯穿全场的歼星射线 |
-| 🛰 蜂群 | 追踪导弹 + 快速循环 | 6 枚强追踪导弹齐射 |
-| ✳ 棱镜风暴 | 湮灭射线 + 能量超载 | 以自身为中心射出 6 道贯穿光束 |
-| 🕳 奇点 | 星爆冲击 + 场域扩张 | 将敌人吸入并撕碎 |
-| 🌪 环刃阵 | 环卫刃 + 推进器 | 8 把高速巨刃构成的绞杀领域 |
+| 🌠 Starbreaker | Pulse Gun + Weak Point Analysis | One shot that tears through the entire field |
+| 🛰 Hive | Seeker Missiles + Rapid Cycling | Six hard-locking missiles per volley |
+| ✳ Prism Storm | Annihilation Beam + Overload | Six piercing beams radiating out from you |
+| 🕳 Singularity | Starburst + Field Expansion | Drags enemies in and shreds them |
+| 🌪 Bladestorm | Orbit Blades + Thrusters | Eight massive blades forming a kill zone |
 
-## 技术
+## Architecture
 
 ```
-index.html      入口 + DOM 界面层（标题/升级/暂停/结算）
-styles.css      霓虹主题
-src/main.js     画布尺寸、固定步长主循环
-src/game.js     世界状态、更新、碰撞、成长（空间哈希网格加速）
-src/content.js  全部数值内容：武器 / 敌人 / 升级卡
-src/render.js   Canvas 2D 渲染
-src/ui.js       HUD 与面板
-src/input.js    键盘 + 虚拟摇杆
-src/audio.js    WebAudio 音效合成
-src/util.js     数学与随机工具
+index.html      Entry point + DOM UI layer (title / level-up / pause / results)
+styles.css      Neon theme
+src/main.js     Canvas sizing, fixed-timestep main loop
+src/game.js     World state, update, collision, progression (spatial hash grid)
+src/content.js  All tunable content: weapons / enemies / upgrade cards
+src/render.js   Canvas 2D rendering
+src/ui.js       HUD and panels
+src/input.js    Keyboard + virtual joystick
+src/audio.js    WebAudio sound synthesis
+src/util.js     Math, seeded RNG
+tools/sim.mjs   Headless balance harness
 ```
 
-- 固定 1/60 秒逻辑步长，渲染与逻辑解耦，掉帧不影响手感
-- 敌人碰撞与索敌走统一空间哈希网格，300 敌人下单帧更新 < 6ms
-- 无打包器：浏览器原生 ES Module 直接加载，推到 GitHub Pages 即可运行
+- Logic runs at a fixed 1/60s step, decoupled from rendering, so frame drops don't change feel
+- Collision and targeting share one spatial hash grid: < 6ms per update at 300 enemies
+- No bundler — the browser loads native ES modules straight from GitHub Pages
 
-## 本地运行
+## Running locally
 
 ```bash
-python3 -m http.server 8099   # 然后打开 http://localhost:8099
+python3 -m http.server 8099   # then open http://localhost:8099
 ```
 
-## 平衡回归
+## Balance regression
 
-游戏逻辑不依赖 DOM，且所有随机都走 `util.setSeed()`，因此可以在 Node 里无头跑对局：
+The game logic has no DOM dependency and all randomness routes through
+`util.setSeed()`, so runs replay bit-for-bit and can be simulated headlessly in Node:
 
 ```bash
-node tools/sim.mjs                                  # 24 局，kite 机器人
+node tools/sim.mjs                                   # 24 runs, kite bot
 node tools/sim.mjs --runs 60 --bot circle --view 420x780
-node tools/sim.mjs --assert-min 90 --assert-max 420  # CI 用的护栏
+node tools/sim.mjs --picks focused                   # one-weapon-line build
+node tools/sim.mjs --assert-min 90 --assert-max 420  # the CI guard
 ```
 
-输出存活时间分位数、等级曲线、母舰击杀率、平均屏内敌人数、单帧耗时。
-CI 在部署前会跑一次，中位存活跌出 90~420 秒区间就拒绝上线。
+It reports survival quantiles, the level curve, Mothership kill rate, average
+on-screen enemy count and peak update cost. CI runs it before every deploy and
+refuses to ship if median survival leaves the 90–420s band.
 
-## 开发日志
+## Devlog
 
-见 [DEVLOG.md](DEVLOG.md)。
+See [DEVLOG.md](DEVLOG.md) — a running record of what each version changed and
+which bugs the headless simulator caught.
 
 ## License
 

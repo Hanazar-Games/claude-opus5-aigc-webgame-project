@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#05060d">
-<meta name="description" content="星海拾荒者 —— 一款在浏览器中运行的霓虹幸存者类 Roguelite 游戏。">
-<title>星海拾荒者 · Starfall Scavenger</title>
+<meta name="description" content="Starfall Scavenger — a neon roguelite survivors game that runs in your browser.">
+<title>Starfall Scavenger</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🛸</text></svg>">
 <link rel="stylesheet" href="./styles.css">
 </head>
@@ -25,40 +25,40 @@
       </div>
     </div>
     <div id="loadout" class="loadout"></div>
-    <button id="btn-pause" class="icon-btn" aria-label="暂停">II</button>
+    <button id="btn-pause" class="icon-btn" aria-label="Pause">II</button>
   </div>
 
   <div id="overlay" class="overlay">
     <div id="panel-title" class="panel">
-      <h1 class="logo">星海拾荒者</h1>
-      <p class="sub">STARFALL SCAVENGER</p>
-      <p class="desc">自动开火 · 移动闪避 · 收集星尘升级<br>活得越久，星海越危险。</p>
-      <button class="btn primary" data-action="start">开始游戏</button>
-      <div class="best">最佳纪录：<span id="best-title">--</span></div>
-      <p class="hint">WASD / 方向键移动 · 触屏拖动摇杆 · P 暂停</p>
+      <h1 class="logo">STARFALL</h1>
+      <p class="sub">S C A V E N G E R</p>
+      <p class="desc">Weapons fire themselves · You just move<br>Collect stardust, level up, evolve.<br>The longer you last, the hungrier the void gets.</p>
+      <button class="btn primary" data-action="start">START RUN</button>
+      <div class="best">Best: <span id="best-title">--</span></div>
+      <p class="hint">WASD / Arrows to move · Drag anywhere on touch · P to pause</p>
     </div>
 
     <div id="panel-levelup" class="panel hidden">
-      <h2 class="lvup">等级提升！</h2>
+      <h2 class="lvup">LEVEL UP</h2>
       <div id="cards" class="cards"></div>
     </div>
 
     <div id="panel-pause" class="panel hidden">
-      <h2>已暂停</h2>
-      <button class="btn primary" data-action="resume">继续</button>
-      <button class="btn" data-action="quit">放弃本局</button>
-      <label class="toggle"><input type="checkbox" id="mute"> 静音</label>
+      <h2>PAUSED</h2>
+      <button class="btn primary" data-action="resume">RESUME</button>
+      <button class="btn" data-action="quit">ABANDON RUN</button>
+      <label class="toggle"><input type="checkbox" id="mute"> Mute</label>
     </div>
 
     <div id="panel-over" class="panel hidden">
-      <h2 class="dead">信号丢失</h2>
+      <h2 class="dead">SIGNAL LOST</h2>
       <div class="result">
-        <div><b id="r-time">00:00</b><span>存活时间</span></div>
-        <div><b id="r-kills">0</b><span>击杀</span></div>
-        <div><b id="r-level">1</b><span>等级</span></div>
+        <div><b id="r-time">00:00</b><span>SURVIVED</span></div>
+        <div><b id="r-kills">0</b><span>KILLS</span></div>
+        <div><b id="r-level">1</b><span>LEVEL</span></div>
       </div>
       <div id="r-best" class="best"></div>
-      <button class="btn primary" data-action="start">再来一局</button>
+      <button class="btn primary" data-action="start">RUN AGAIN</button>
     </div>
   </div>
 
