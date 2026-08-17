@@ -8,7 +8,7 @@ const CELL = 64;
 
 export const G = {
   state: 'title',
-  time: 0, kills: 0, bossCount: 0, bossKills: 0,
+  time: 0, kills: 0, bossCount: 0, bossSpawns: 0, bossKills: 0,
   player: null,
   enemies: [], bullets: [], ebullets: [], orbs: [], pickups: [], parts: [], texts: [], novas: [],
   cam: { x: 0, y: 0, shake: 0 },
@@ -20,7 +20,7 @@ export const G = {
 
 /* ------------------------------------------------------------------- setup */
 export function newRun() {
-  G.time = 0; G.kills = 0; G.bossCount = 0; G.bossKills = 0; G.spawnAcc = 0; G.nextBoss = BOSS_INTERVAL;
+  G.time = 0; G.kills = 0; G.bossCount = 0; G.bossSpawns = 0; G.bossKills = 0; G.spawnAcc = 0; G.nextBoss = BOSS_INTERVAL;
   G.enemies.length = G.bullets.length = G.ebullets.length = 0;
   G.orbs.length = G.pickups.length = G.parts.length = G.texts.length = G.novas.length = 0;
   G.cam.x = G.cam.y = 0; G.cam.shake = 0;
@@ -247,7 +247,9 @@ function director(dt) {
     // Motherships are the only threat that scales with kill count, so tighten
     // their cadence over a run — this is what ends otherwise-unbounded games.
     G.nextBoss += Math.max(42, BOSS_INTERVAL - G.bossCount * 9);
-    spawnEnemy('boss');
+    // Deep runs get escorts; a single boss stops mattering to an evolved build.
+    const wave = G.bossCount >= 4 ? 2 : 1;
+    for (let i = 0; i < wave; i++) { spawnEnemy('boss'); G.bossSpawns++; }
     G.texts.push({ x: G.player.x, y: G.player.y - 70, t: 0, v: 'MOTHERSHIP INBOUND', color: '#ff4d5e', big: true, life: 2.4 });
     sfx.boss();
   }

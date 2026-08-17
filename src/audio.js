@@ -60,3 +60,75 @@ export const sfx = {
   dead: () => [660, 520, 400, 260].forEach((f, i) => tone({ freq: f, to: f * 0.7, dur: 0.3, type: 'triangle', vol: 0.25, delay: i * 0.14 })),
   select: () => tone({ freq: 620, to: 900, dur: 0.09, type: 'sine', vol: 0.18 }),
 };
+
+/* ------------------------------------------------------------------- music */
+// Generative bed, no audio files: a 4-bar minor progression whose layers switch
+// on as the run heats up. `intensity` (0..1) is driven by elapsed run time.
+const BPM = 104, STEP_DUR = 60 / BPM / 2;      // eighth notes
+const ROOTS = [110.00, 87.31, 130.81, 98.00];  // Am · F · C · G
+const SCALE = [0, 3, 5, 7, 10];                // minor pentatonic offsets (semitones)
+const semi = (f, n) => f * Math.pow(2, n / 12);
+
+let musicGain = null, timer = null, step = 0, nextTime = 0;
+export const music = { intensity: 0 };
+
+function voice(freq, at, dur, type, vol, glide) {
+  const osc = ctx.createOscillator(), g = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, at);
+  if (glide) osc.frequency.exponentialRampToValueAtTime(glide, at + dur);
+  g.gain.setValueAtTime(0, at);
+  g.gain.linearRampToValueAtTime(vol, at + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  osc.connect(g); g.connect(musicGain);
+  osc.start(at); osc.stop(at + dur + 0.02);
+}
+
+function scheduleStep(i, at) {
+  const bar = (i >> 3) % 4, beat = i % 8;
+  const root = ROOTS[bar];
+  const k = music.intensity;
+
+  if (beat % 4 === 0) voice(root / 2, at, 0.5, 'triangle', 0.5, root / 2 * 0.985);  // bass
+  if (k > 0.15 && beat % 2 === 0) voice(root, at, 0.34, 'sine', 0.16);              // pulse
+  if (k > 0.35 && beat % 2 === 1) {                                                  // arp
+    const n = SCALE[(i * 3 + bar) % SCALE.length];
+    voice(semi(root * 2, n), at, 0.2, 'square', 0.055);
+  }
+  if (k > 0.6 && beat === 6) {                                                       // counter-melody
+    const n = SCALE[(i * 5) % SCALE.length];
+    voice(semi(root * 4, n), at, 0.16, 'triangle', 0.04);
+  }
+}
+
+function tick() {
+  if (!ctx) return;
+  while (nextTime < ctx.currentTime + 0.2) {
+    scheduleStep(step++, nextTime);
+    nextTime += STEP_DUR;
+  }
+}
+
+export function startMusic() {
+  const c = ensure();
+  if (!c) return;
+  if (!musicGain) {
+    musicGain = c.createGain();
+    musicGain.gain.value = 0.34;
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 2600;
+    musicGain.connect(lp); lp.connect(master);
+  }
+  stopMusic();
+  step = 0; nextTime = c.currentTime + 0.1;
+  timer = setInterval(tick, 40);
+}
+
+export function stopMusic() {
+  if (timer) { clearInterval(timer); timer = null; }
+}
+
+export function setMuted(v) {
+  audio.muted = v;
+  if (musicGain) musicGain.gain.value = v ? 0 : 0.34;
+}

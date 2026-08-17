@@ -1,7 +1,7 @@
 import { G, applyCard, newRun } from './game.js';
 import { WEAPONS } from './content.js';
 import { fmtTime } from './util.js';
-import { sfx, audio, unlockAudio } from './audio.js';
+import { sfx, unlockAudio, startMusic, stopMusic, setMuted, music } from './audio.js';
 
 const $ = id => document.getElementById(id);
 const el = {
@@ -36,13 +36,13 @@ export function initUI() {
     if (!btn) return;
     unlockAudio(); sfx.select();
     const a = btn.dataset.action;
-    if (a === 'start') { newRun(); showPanel(null); }
+    if (a === 'start') { newRun(); showPanel(null); startMusic(); }
     else if (a === 'resume') { G.state = 'playing'; showPanel(null); }
-    else if (a === 'quit') { G.state = 'title'; showPanel('title'); }
+    else if (a === 'quit') { G.state = 'title'; showPanel('title'); stopMusic(); }
   });
 
   $('btn-pause').addEventListener('click', togglePause);
-  $('mute').addEventListener('change', e => { audio.muted = e.target.checked; });
+  $('mute').addEventListener('change', e => setMuted(e.target.checked));
 
   G.onLevelUp = showCards;
   G.onDeath = showGameOver;
@@ -71,9 +71,16 @@ function showCards(cards) {
 }
 
 function showGameOver() {
+  stopMusic();
   $('r-time').textContent = fmtTime(G.time);
   $('r-kills').textContent = G.kills;
   $('r-level').textContent = G.player.level;
+  // final loadout + what the run actually achieved
+  $('r-build').innerHTML = G.player.weapons
+    .map(w => `<span class="wchip${WEAPONS[w.id].evolved ? ' evo' : ''}">${WEAPONS[w.id].icon} ${WEAPONS[w.id].name}${WEAPONS[w.id].evolved ? '' : ` Lv.${w.lv}`}</span>`)
+    .join('');
+  const evos = G.player.weapons.filter(w => WEAPONS[w.id].evolved).length;
+  $('r-extra').textContent = `${G.bossKills} mothership${G.bossKills === 1 ? '' : 's'} destroyed · ${evos} evolution${evos === 1 ? '' : 's'}`;
   const isBest = G.time > (best.time || 0);
   if (isBest) { best.time = G.time; best.kills = G.kills; best.level = G.player.level; saveBest(); }
   $('r-best').textContent = isBest ? '★ NEW RECORD' : `Best: ${fmtTime(best.time)}`;
@@ -99,6 +106,7 @@ export function syncHUD() {
   el.xpFill.style.width = Math.min(100, p.xp / p.xpNext * 100) + '%';
   el.xpText.textContent = `Lv.${p.level}`;
   el.timer.textContent = fmtTime(G.time);
+  music.intensity = Math.min(1, G.time / 150);
   el.kills.textContent = `☠ ${G.kills}`;
   syncLoadout();
 }

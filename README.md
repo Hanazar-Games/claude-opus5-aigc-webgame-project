@@ -1,8 +1,9 @@
 # Starfall Scavenger
 
 A neon roguelite survivors game that runs entirely in the browser. No build step,
-no dependencies, no art assets — every shape is drawn with Canvas 2D and every
-sound is synthesised at runtime with WebAudio.
+no dependencies, no art assets — every shape is drawn with Canvas 2D, and every
+sound *and the soundtrack itself* is synthesised at runtime with WebAudio. The
+whole game is about 40 KB of source.
 
 **▶ Play: https://hanazar-games.github.io/claude-opus5-aigc-webgame-project/**
 
@@ -64,6 +65,8 @@ tools/sim.mjs   Headless balance harness
 - Logic runs at a fixed 1/60s step, decoupled from rendering, so frame drops don't change feel
 - Collision and targeting share one spatial hash grid: < 6ms per update at 300 enemies
 - No bundler — the browser loads native ES modules straight from GitHub Pages
+- The music is generated, not streamed: a 4-bar minor progression whose layers
+  (bass → pulse → arpeggio → counter-melody) switch on as the run intensifies
 
 ## Running locally
 

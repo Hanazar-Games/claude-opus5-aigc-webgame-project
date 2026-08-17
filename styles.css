@@ -92,3 +92,10 @@ h2.dead{color:var(--red);text-shadow:0 0 20px rgba(255,90,110,.45)}
 .card.evo .ico{background:rgba(255,196,77,.18);border-color:var(--amber)}
 .card p em{display:block;margin-top:5px;font-style:normal;font-size:10px;color:var(--amber);letter-spacing:.5px}
 .tag.evo{background:rgba(255,196,77,.25);color:var(--amber)}
+
+/* run summary on the results panel */
+.build{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:4px 0 10px}
+.wchip{font-size:11px;padding:5px 9px;border-radius:8px;border:1px solid var(--line);
+  background:rgba(255,255,255,.04);color:#b8c6e6}
+.wchip.evo{border-color:var(--amber);color:var(--amber);background:rgba(255,196,77,.12)}
+.extra{font-size:11px;color:var(--dim);letter-spacing:.5px}

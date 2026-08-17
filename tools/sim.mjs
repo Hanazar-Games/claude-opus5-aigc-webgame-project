@@ -106,7 +106,7 @@ function runOne(seed) {
   input.x = input.y = 0;
   return {
     time: G.time, kills: G.kills, level: G.player.level,
-    bossSpawned: G.bossCount, bossKilled: G.bossKills,
+    bossSpawned: G.bossSpawns, bossKilled: G.bossKills,
     weapons: G.player.weapons.map(w => `${w.id}${w.lv}`).join(' '),
     visible: visSum / Math.max(1, visN), peak,
   };
