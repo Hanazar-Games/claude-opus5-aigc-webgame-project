@@ -10,7 +10,7 @@
  * util.setSeed(), so a given seed replays exactly. Use this to check whether a
  * balance change actually moved the numbers instead of eyeballing the canvas.
  */
-import { G, update, newRun, rollCards, applyCard } from '../src/game.js';
+import { G, TUNE, update, newRun, rollCards, applyCard } from '../src/game.js';
 import { input } from '../src/input.js';
 import { setSeed } from '../src/util.js';
 
@@ -115,6 +115,26 @@ function runOne(seed) {
 const q = (xs, p) => xs.slice().sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(xs.length * p))];
 const f1 = n => n.toFixed(1);
 
+/* Parameter sweep: run the whole battery once per value of a TUNE knob so a
+   balance decision can be made from the curve instead of one hand-picked number. */
+const sweep = arg('sweep', null);
+if (sweep) {
+  const [key, ...vals] = sweep.split(',');
+  console.log(`\n  sweep ${key} · ${RUNS} runs each · bot=${BOT} picks=${PICKS} cap=${CAP}s\n`);
+  console.log('  value   p25     median  p75     lvl  bossK  cap');
+  for (const v of vals) {
+    TUNE[key] = +v;
+    const rs = [];
+    for (let s = 1; s <= RUNS; s++) rs.push(runOne(s));
+    const ts = rs.map(r => r.time), lv = rs.map(r => r.level);
+    console.log(`  ${String(v).padEnd(7)} ${f1(q(ts, .25)).padEnd(7)} ${f1(q(ts, .5)).padEnd(7)} ${f1(q(ts, .75)).padEnd(7)} ` +
+      `${String(q(lv, .5)).padEnd(4)} ${String(rs.reduce((a, r) => a + r.bossKilled, 0)).padEnd(6)} ` +
+      `${rs.filter(r => r.time >= CAP - 0.5).length}/${RUNS}`);
+  }
+  console.log('');
+  process.exit(0);
+}
+
 const results = [];
 for (let s = 1; s <= RUNS; s++) results.push(runOne(s));
 
@@ -138,6 +158,22 @@ for (const r of results) for (const w of r.weapons.split(' ')) {
 }
 console.log('  weapons taken: ' + Object.entries(wc).sort((a, b) => b[1] - a[1])
   .map(([k, v]) => `${k} ${v}`).join('  ') + '\n');
+
+/* Invariants. These need no judgement about whether a number "looks right", and
+   they have caught more real bugs than the tuning figures above: double-counted
+   kills (v0.3) and a miscounted boss wave (v0.5) both showed up here first. */
+const bad = [];
+for (const [i, r] of results.entries()) {
+  const seed = i + 1;
+  if (r.bossKilled > r.bossSpawned) bad.push(`seed ${seed}: killed ${r.bossKilled} bosses but only ${r.bossSpawned} spawned`);
+  if (r.time < 0 || !Number.isFinite(r.time)) bad.push(`seed ${seed}: bogus run time ${r.time}`);
+  if (r.level < 1) bad.push(`seed ${seed}: level ${r.level} below start`);
+  if (r.kills < 0) bad.push(`seed ${seed}: negative kills ${r.kills}`);
+}
+if (bad.length) {
+  console.error('FAIL: invariant violated\n  ' + bad.slice(0, 5).join('\n  '));
+  process.exit(1);
+}
 
 /* CI guard: a balance edit that tanks or trivialises the game should fail loudly. */
 const min = +arg('assert-min', 0), max = +arg('assert-max', 0);

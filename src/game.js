@@ -6,6 +6,9 @@ import { readMove } from './input.js';
 const ENEMY_CAP = 380;
 const CELL = 64;
 
+/** Knobs the balance sim can sweep (see `node tools/sim.mjs --sweep`). */
+export const TUNE = { hpDouble: 78 };
+
 export const G = {
   state: 'title',
   time: 0, kills: 0, bossCount: 0, bossSpawns: 0, bossKills: 0,
@@ -214,7 +217,11 @@ function spawnPoint() {
 function spawnEnemy(type, at, forceNormal = false) {
   const def = ENEMIES[type];
   const t = G.time;
-  const hpMult = 1 + t / 80 + (t / 190) ** 2 + (def.boss ? (G.bossCount - 1) * 0.75 : 0);
+  // Player DPS compounds (damage% x rate% x crit x weapon levels x evolution),
+  // so it grows roughly exponentially with pick count. Additive enemy HP could
+  // never keep up, which is why strong builds ran away. Match the shape: HP
+  // doubles every TUNE.hpDouble seconds.
+  const hpMult = Math.pow(2, t / TUNE.hpDouble) + (def.boss ? (G.bossCount - 1) * 0.75 : 0);
   const dmgMult = 1 + t / 200;
   const p = at || spawnPoint();
   // Elites: rare, fat, slow, worth a lot — they hand out the run's power spikes.

@@ -84,11 +84,20 @@ node tools/sim.mjs                                   # 24 runs, kite bot
 node tools/sim.mjs --runs 60 --bot circle --view 420x780
 node tools/sim.mjs --picks focused                   # one-weapon-line build
 node tools/sim.mjs --assert-min 90 --assert-max 420  # the CI guard
+node tools/sim.mjs --sweep hpDouble,70,85,100        # sweep a balance knob
 ```
 
 It reports survival quantiles, the level curve, Mothership kill rate, average
-on-screen enemy count and peak update cost. CI runs it before every deploy and
-refuses to ship if median survival leaves the 90–420s band.
+on-screen enemy count and peak update cost. `--sweep` re-runs the whole battery
+across values of a knob in `TUNE`, so balance calls are made from a curve rather
+than a single hand-picked number.
+
+It also asserts **invariants** — e.g. bosses killed can never exceed bosses
+spawned. Those checks need no judgement about whether a figure looks plausible,
+and they have caught more real bugs than the tuning numbers have.
+
+CI runs it before every deploy and refuses to ship on a violated invariant or if
+median survival leaves the 90–420s band.
 
 ## Devlog
 
