@@ -1,12 +1,13 @@
 import { G, applyCard, newRun } from './game.js';
 import { WEAPONS } from './content.js';
 import { fmtTime } from './util.js';
-import { sfx, unlockAudio, startMusic, stopMusic, setMuted, music } from './audio.js';
+import { sfx, unlockAudio, startMusic, stopMusic, setMusicPaused, setMuted, loadMuted, music } from './audio.js';
+import { VERSION, NEWS } from './news.js';
 
 const $ = id => document.getElementById(id);
 const el = {
   hud: $('hud'), overlay: $('overlay'),
-  title: $('panel-title'), levelup: $('panel-levelup'), pause: $('panel-pause'), over: $('panel-over'),
+  title: $('panel-title'), levelup: $('panel-levelup'), pause: $('panel-pause'), over: $('panel-over'), news: $('panel-news'),
   hpFill: $('hp-fill'), hpText: $('hp-text'), xpFill: $('xp-fill'), xpText: $('xp-text'),
   timer: $('timer'), kills: $('kills'), loadout: $('loadout'), cards: $('cards'),
 };
@@ -21,8 +22,9 @@ function saveBest() {
   try { localStorage.setItem(BEST_KEY, JSON.stringify(best)); } catch { }
 }
 
+let prevPanel = 'title';
 function showPanel(name) {
-  for (const k of ['title', 'levelup', 'pause', 'over']) el[k].classList.toggle('hidden', k !== name);
+  for (const k of ['title', 'levelup', 'pause', 'over', 'news']) el[k].classList.toggle('hidden', k !== name);
   el.overlay.classList.toggle('hidden', !name);
   el.hud.classList.toggle('hidden', name === 'title');
 }
@@ -31,18 +33,40 @@ export function initUI() {
   loadBest();
   $('best-title').textContent = best.time ? `${fmtTime(best.time)} · ☠${best.kills}` : '--';
 
+  buildNews();
+  $('ver-badge').textContent = VERSION;
+
   document.addEventListener('click', e => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     unlockAudio(); sfx.select();
     const a = btn.dataset.action;
     if (a === 'start') { newRun(); showPanel(null); startMusic(); }
-    else if (a === 'resume') { G.state = 'playing'; showPanel(null); }
+    else if (a === 'resume') { G.state = 'playing'; showPanel(null); setMusicPaused(false); }
     else if (a === 'quit') { G.state = 'title'; showPanel('title'); stopMusic(); }
+    else if (a === 'news') { prevPanel = G.state === 'paused' ? 'pause' : 'title'; showPanel('news'); }
+    else if (a === 'news-close') showPanel(prevPanel);
   });
 
   $('btn-pause').addEventListener('click', togglePause);
-  $('mute').addEventListener('change', e => setMuted(e.target.checked));
+
+  // one mute setting, two checkboxes (title + pause), persisted
+  const boxes = [...document.querySelectorAll('.mute-box')];
+  const muted = loadMuted();
+  for (const b of boxes) {
+    b.checked = muted;
+    b.addEventListener('change', ev => {
+      setMuted(ev.target.checked);
+      for (const o of boxes) o.checked = ev.target.checked;
+    });
+  }
+
+  // level-up cards are pickable with 1 / 2 / 3
+  addEventListener('keydown', ev => {
+    if (G.state !== 'levelup') return;
+    const i = ['Digit1', 'Digit2', 'Digit3'].indexOf(ev.code);
+    if (i >= 0) el.cards.children[i]?.click();
+  });
 
   G.onLevelUp = showCards;
   G.onDeath = showGameOver;
@@ -50,8 +74,18 @@ export function initUI() {
 }
 
 export function togglePause() {
-  if (G.state === 'playing') { G.state = 'paused'; showPanel('pause'); }
-  else if (G.state === 'paused') { G.state = 'playing'; showPanel(null); }
+  if (G.state === 'playing') { G.state = 'paused'; showPanel('pause'); setMusicPaused(true); }
+  else if (G.state === 'paused') { G.state = 'playing'; showPanel(null); setMusicPaused(false); }
+}
+
+function entryHTML(n) {
+  return `<div class="news-entry"><h3><b>${n.v}</b> · ${n.title}</h3><ul>` +
+    n.notes.map(x => `<li>${x}</li>`).join('') + '</ul></div>';
+}
+
+function buildNews() {
+  $('news-current').innerHTML = entryHTML(NEWS[0]);
+  $('news-old').innerHTML = NEWS.slice(1).map(entryHTML).join('');
 }
 
 function showCards(cards) {

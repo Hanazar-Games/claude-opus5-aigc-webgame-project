@@ -59,6 +59,9 @@ export const sfx = {
   boss: () => [0, 0.18].forEach(d => tone({ freq: 90, to: 46, dur: 0.5, type: 'sawtooth', vol: 0.3, delay: d })),
   dead: () => [660, 520, 400, 260].forEach((f, i) => tone({ freq: f, to: f * 0.7, dur: 0.3, type: 'triangle', vol: 0.25, delay: i * 0.14 })),
   select: () => tone({ freq: 620, to: 900, dur: 0.09, type: 'sine', vol: 0.18 }),
+  heal: () => [523, 784].forEach((f, i) => tone({ freq: f, dur: 0.18, type: 'sine', vol: 0.2, delay: i * 0.07 })),
+  magnet: () => tone({ freq: 300, to: 1200, dur: 0.26, type: 'triangle', vol: 0.18 }),
+  strike: () => { tone({ freq: 160, to: 50, dur: 0.42, type: 'sawtooth', vol: 0.28 }); noise({ dur: 0.4, vol: 0.22, freq: 700 }); },
 };
 
 /* ------------------------------------------------------------------- music */
@@ -69,7 +72,8 @@ const ROOTS = [110.00, 87.31, 130.81, 98.00];  // Am · F · C · G
 const SCALE = [0, 3, 5, 7, 10];                // minor pentatonic offsets (semitones)
 const semi = (f, n) => f * Math.pow(2, n / 12);
 
-let musicGain = null, timer = null, step = 0, nextTime = 0;
+const MUSIC_VOL = 0.34;
+let musicGain = null, timer = null, step = 0, nextTime = 0, paused = false;
 export const music = { intensity: 0 };
 
 function voice(freq, at, dur, type, vol, glide) {
@@ -109,17 +113,22 @@ function tick() {
   }
 }
 
+function applyMusicGain() {
+  if (musicGain) musicGain.gain.value = (audio.muted || paused) ? 0 : MUSIC_VOL;
+}
+
 export function startMusic() {
   const c = ensure();
   if (!c) return;
   if (!musicGain) {
     musicGain = c.createGain();
-    musicGain.gain.value = 0.34;
     const lp = c.createBiquadFilter();
     lp.type = 'lowpass'; lp.frequency.value = 2600;
     musicGain.connect(lp); lp.connect(master);
   }
   stopMusic();
+  paused = false;
+  applyMusicGain();          // respect a mute chosen before music ever started
   step = 0; nextTime = c.currentTime + 0.1;
   timer = setInterval(tick, 40);
 }
@@ -128,7 +137,22 @@ export function stopMusic() {
   if (timer) { clearInterval(timer); timer = null; }
 }
 
+/** Silence and stop scheduling while the game is paused / the tab is hidden. */
+export function setMusicPaused(v) {
+  if (v === paused) return;
+  paused = v;
+  applyMusicGain();
+  if (v) { if (timer) { clearInterval(timer); timer = null; } }
+  else if (ctx && !timer) { nextTime = ctx.currentTime + 0.05; timer = setInterval(tick, 40); }
+}
+
 export function setMuted(v) {
   audio.muted = v;
-  if (musicGain) musicGain.gain.value = v ? 0 : 0.34;
+  applyMusicGain();
+  try { localStorage.setItem('starfall.muted', v ? '1' : '0'); } catch { }
+}
+
+export function loadMuted() {
+  try { audio.muted = localStorage.getItem('starfall.muted') === '1'; } catch { }
+  return audio.muted;
 }

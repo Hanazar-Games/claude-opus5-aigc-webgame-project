@@ -34,7 +34,9 @@
       <p class="sub">S C A V E N G E R</p>
       <p class="desc">Weapons fire themselves · You just move<br>Collect stardust, level up, evolve.<br>The longer you last, the hungrier the void gets.</p>
       <button class="btn primary" data-action="start">START RUN</button>
+      <button class="btn" data-action="news">WHAT'S NEW <span id="ver-badge" class="ver"></span></button>
       <div class="best">Best: <span id="best-title">--</span></div>
+      <label class="toggle"><input type="checkbox" class="mute-box"> Mute</label>
       <p class="hint">WASD / Arrows to move · Drag anywhere on touch · P to pause</p>
     </div>
 
@@ -47,7 +49,17 @@
       <h2>PAUSED</h2>
       <button class="btn primary" data-action="resume">RESUME</button>
       <button class="btn" data-action="quit">ABANDON RUN</button>
-      <label class="toggle"><input type="checkbox" id="mute"> Mute</label>
+      <label class="toggle"><input type="checkbox" class="mute-box"> Mute</label>
+    </div>
+
+    <div id="panel-news" class="panel hidden">
+      <h2>PATCH NOTES</h2>
+      <div id="news-current"></div>
+      <details id="news-history">
+        <summary>Earlier versions</summary>
+        <div id="news-old"></div>
+      </details>
+      <button class="btn primary" data-action="news-close">BACK</button>
     </div>
 
     <div id="panel-over" class="panel hidden">

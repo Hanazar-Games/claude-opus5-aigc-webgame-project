@@ -2,7 +2,7 @@ import { G, update } from './game.js';
 import { render, seedStars } from './render.js';
 import { initUI, syncHUD, togglePause } from './ui.js';
 import { initInput, input } from './input.js';
-import { unlockAudio } from './audio.js';
+import { unlockAudio, setMusicPaused } from './audio.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d', { alpha: false });
@@ -24,7 +24,8 @@ input.onPause = togglePause;
 addEventListener('pointerdown', unlockAudio, { once: true });
 addEventListener('keydown', unlockAudio, { once: true });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && G.state === 'playing') togglePause();
+  if (document.hidden) { if (G.state === 'playing') togglePause(); setMusicPaused(true); }
+  else if (G.state === 'playing') setMusicPaused(false);
 });
 
 const STEP = 1 / 60;

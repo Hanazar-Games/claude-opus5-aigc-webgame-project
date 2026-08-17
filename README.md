@@ -12,7 +12,7 @@ whole game is about 40 KB of source.
 - **Move** — `WASD` / arrow keys, or drag anywhere on a touch screen for a virtual stick
 - **Shoot** — automatic. Most weapons hit the nearest enemy; missiles and beams prioritise the Mothership
 - **Grow** — kills drop stardust; collect it to level up and pick 1 of 3 cards
-- **Pause** — `P` / `Esc` / the button in the corner
+- **Pause** — `P` / `Esc` / the button in the corner. Level-up cards can also be picked with `1` / `2` / `3`
 - A **Mothership** arrives every 90 seconds, and the gap shrinks each time one appears. Enemies get faster, tougher and denser as you survive
 - **Elites** (gold outline) are slow and tanky but worth 8× XP and always drop an item.
   Past 100s they carry a modifier, shown as a coloured dashed ring:
@@ -57,7 +57,8 @@ src/content.js  All tunable content: weapons / enemies / upgrade cards
 src/render.js   Canvas 2D rendering
 src/ui.js       HUD and panels
 src/input.js    Keyboard + virtual joystick
-src/audio.js    WebAudio sound synthesis
+src/audio.js    WebAudio SFX + generative soundtrack
+src/news.js     Version + patch notes
 src/util.js     Math, seeded RNG
 tools/sim.mjs   Headless balance harness
 ```

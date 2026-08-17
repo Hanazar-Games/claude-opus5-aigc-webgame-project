@@ -99,3 +99,21 @@ h2.dead{color:var(--red);text-shadow:0 0 20px rgba(255,90,110,.45)}
   background:rgba(255,255,255,.04);color:#b8c6e6}
 .wchip.evo{border-color:var(--amber);color:var(--amber);background:rgba(255,196,77,.12)}
 .extra{font-size:11px;color:var(--dim);letter-spacing:.5px}
+
+/* patch notes */
+.ver{font-size:10px;color:var(--amber);letter-spacing:1px;margin-left:6px}
+.news-entry{text-align:left;margin-bottom:14px}
+.news-entry h3{font-size:13px;letter-spacing:1px;color:var(--cyan);margin-bottom:8px}
+.news-entry h3 b{color:var(--amber);font-weight:600}
+.news-entry ul{list-style:none;display:flex;flex-direction:column;gap:6px}
+.news-entry li{font-size:11.5px;line-height:1.65;color:#b8c6e6;padding-left:14px;position:relative}
+.news-entry li::before{content:'▸';position:absolute;left:0;color:var(--cyan);opacity:.7}
+#news-history{margin:6px 0 14px;text-align:left}
+#news-history summary{cursor:pointer;font-size:11px;letter-spacing:1px;color:var(--dim);
+  padding:8px 0;list-style:none}
+#news-history summary::-webkit-details-marker{display:none}
+#news-history summary::before{content:'▸ ';color:var(--cyan)}
+#news-history[open] summary::before{content:'▾ '}
+#news-history summary:hover{color:var(--cyan)}
+#news-old .news-entry h3{color:var(--dim)}
+#news-old .news-entry li{font-size:11px;color:#93a3c4}

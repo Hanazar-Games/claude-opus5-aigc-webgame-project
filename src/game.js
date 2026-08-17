@@ -172,7 +172,7 @@ function dropPickup(x, y, kind) {
 function collectPickup(pk) {
   const p = G.player;
   pk.got = true;
-  sfx.levelup();
+  sfx[pk.kind === 'heal' ? 'heal' : pk.kind === 'magnet' ? 'magnet' : 'strike']();
   if (pk.kind === 'heal') {
     p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.3);
     G.texts.push({ x: p.x, y: p.y - 30, t: 0, v: '+HP', color: '#5cff9d' });
@@ -245,7 +245,6 @@ function spawnEnemy(type, at, forceNormal = false) {
  * can't be shot down), haste closes the gap kiting relies on.
  */
 const AFFIXES = ['splitter', 'volley', 'haste'];
-const AFFIX_COLOR = { splitter: '#5cff9d', volley: '#ff4d5e', haste: '#4df3ff' };
 
 function director(dt) {
   const t = G.time;
@@ -518,9 +517,13 @@ export function rollCards() {
       pool.push({ kind: 'up', id, icon: WEAPONS[id].icon, name: `${WEAPONS[id].name} Lv.${w.lv + 1}`, desc: WEAPONS[id].desc(w.lv + 1), weight: 5 });
   }
   if (owned.size < 4)
-    for (const id of Object.keys(WEAPONS))
-      if (!owned.has(id) && !WEAPONS[id].evolved)
-        pool.push({ kind: 'new', id, icon: WEAPONS[id].icon, name: WEAPONS[id].name, desc: WEAPONS[id].desc(1), weight: 4 });
+    for (const id of Object.keys(WEAPONS)) {
+      const def = WEAPONS[id];
+      // Never re-offer a base weapon once its evolution is owned: taking it would
+      // burn a slot on a strictly worse version of something you already have.
+      if (owned.has(id) || def.evolved || (def.evo && owned.has(def.evo.id))) continue;
+      pool.push({ kind: 'new', id, icon: def.icon, name: def.name, desc: def.desc(1), weight: 4 });
+    }
   for (const s of STAT_UPGRADES) {
     // Nudge the stat that would unlock a pending evolution.
     const unlocks = p.weapons.some(w => {
