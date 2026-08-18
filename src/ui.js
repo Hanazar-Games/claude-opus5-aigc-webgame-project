@@ -13,6 +13,7 @@ const el = {
 };
 
 const BEST_KEY = 'starfall.best.v1';
+const SEEN_KEY = 'starfall.seenVersion';
 export const best = { time: 0, kills: 0, level: 1 };
 
 function loadBest() {
@@ -34,7 +35,12 @@ export function initUI() {
   $('best-title').textContent = best.time ? `${fmtTime(best.time)} · ☠${best.kills}` : '--';
 
   buildNews();
-  $('ver-badge').textContent = VERSION;
+  const badge = $('ver-badge');
+  badge.textContent = VERSION;
+  // flag the button until the player has actually read this version's notes
+  let seen = '';
+  try { seen = localStorage.getItem(SEEN_KEY) || ''; } catch { }
+  if (seen !== VERSION) badge.classList.add('unseen');
 
   document.addEventListener('click', e => {
     const btn = e.target.closest('[data-action]');
@@ -44,7 +50,12 @@ export function initUI() {
     if (a === 'start') { newRun(); showPanel(null); startMusic(); }
     else if (a === 'resume') { G.state = 'playing'; showPanel(null); setMusicPaused(false); }
     else if (a === 'quit') { G.state = 'title'; showPanel('title'); stopMusic(); }
-    else if (a === 'news') { prevPanel = G.state === 'paused' ? 'pause' : 'title'; showPanel('news'); }
+    else if (a === 'news') {
+      prevPanel = G.state === 'paused' ? 'pause' : 'title';
+      showPanel('news');
+      $('ver-badge').classList.remove('unseen');
+      try { localStorage.setItem(SEEN_KEY, VERSION); } catch { }
+    }
     else if (a === 'news-close') showPanel(prevPanel);
   });
 
@@ -97,7 +108,8 @@ function showCards(cards) {
     const d = document.createElement('button');
     d.className = c.kind === 'evo' ? 'card evo' : 'card';
     const from = c.kind === 'evo' ? `<em>${WEAPONS[c.id].from}</em>` : '';
-    d.innerHTML = `<div class="ico">${c.icon}</div><div><h3>${c.name}${tag}</h3><p>${c.desc}${from}</p></div>`;
+    d.innerHTML = `<kbd>${cards.indexOf(c) + 1}</kbd><div class="ico">${c.icon}</div>` +
+      `<div><h3>${c.name}${tag}</h3><p>${c.desc}${from}</p></div>`;
     d.addEventListener('click', () => { sfx.select(); applyCard(c); showPanel(null); syncLoadout(); });
     el.cards.appendChild(d);
   }
@@ -140,7 +152,7 @@ export function syncHUD() {
   el.xpFill.style.width = Math.min(100, p.xp / p.xpNext * 100) + '%';
   el.xpText.textContent = `Lv.${p.level}`;
   el.timer.textContent = fmtTime(G.time);
-  music.intensity = Math.min(1, G.time / 150);
+  music.intensity = 0.2 + 0.8 * Math.min(1, G.time / 110);
   el.kills.textContent = `☠ ${G.kills}`;
   syncLoadout();
 }

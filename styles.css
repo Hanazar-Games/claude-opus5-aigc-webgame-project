@@ -117,3 +117,14 @@ h2.dead{color:var(--red);text-shadow:0 0 20px rgba(255,90,110,.45)}
 #news-history summary:hover{color:var(--cyan)}
 #news-old .news-entry h3{color:var(--dim)}
 #news-old .news-entry li{font-size:11px;color:#93a3c4}
+
+/* keyboard affordance on level-up cards */
+.card kbd{flex:none;width:20px;height:20px;display:grid;place-items:center;border-radius:5px;
+  border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--dim);
+  font:600 10px/1 inherit;align-self:flex-start;margin-top:2px}
+.card:hover kbd{border-color:var(--cyan);color:var(--cyan)}
+.card.evo kbd{border-color:rgba(255,196,77,.5);color:var(--amber)}
+
+/* unseen-version dot on the patch notes button */
+.ver.unseen::after{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:var(--red);margin-left:6px;vertical-align:1px;box-shadow:0 0 6px var(--red)}

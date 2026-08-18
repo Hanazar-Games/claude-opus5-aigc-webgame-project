@@ -7,12 +7,17 @@ export const WEAPONS = {
   blaster: {
     evo: { id: 'railgun', stat: 'crit' },
     name: 'Pulse Gun', icon: '🔫', max: 4,
-    desc: lv => `Fires ${1 + (lv >= 3 ? 1 : 0) + (lv >= 5 ? 1 : 0)} bolt(s) at the nearest target`,
-    stats: lv => ({ cd: 0.58 - lv * 0.045, dmg: 14 + lv * 7, count: 1 + (lv >= 3) + (lv >= 5), pierce: lv >= 4 ? 1 : 0, speed: 560 }),
+    desc: lv => (lv >= 3 ? 'Fires 2 bolts' : 'Fires a bolt') + ' at the nearest target'
+      + (lv >= 4 ? ', piercing one extra enemy' : ''),
+    stats: lv => ({ cd: 0.58 - lv * 0.045, dmg: 14 + lv * 7, count: lv >= 3 ? 2 : 1, pierce: lv >= 4 ? 1 : 0, speed: 560 }),
     fire(G, s) {
       const t = G.nearestEnemy(G.player, 400); if (!t) return;
-      const base = Math.atan2(t.y - G.player.y, t.x - G.player.x);
-      const spread = 0.14;
+      const dx = t.x - G.player.x, dy = t.y - G.player.y;
+      const base = Math.atan2(dy, dx);
+      // Spread is an angle derived from a fixed lateral gap AT THE TARGET. With a
+      // constant angle, an even-numbered volley straddles the target and both
+      // bolts sail past it at range — levelling the gun made it miss more.
+      const spread = Math.atan2(9, Math.max(40, Math.hypot(dx, dy)));
       for (let i = 0; i < s.count; i++) {
         const a = base + (i - (s.count - 1) / 2) * spread;
         G.spawnBullet({ a, speed: s.speed, dmg: s.dmg, r: 4, pierce: s.pierce, color: '#4df3ff', life: 0.95 });
@@ -22,7 +27,8 @@ export const WEAPONS = {
   missile: {
     evo: { id: 'swarm', stat: 'rate' },
     name: 'Seeker Missiles', icon: '🚀', max: 4,
-    desc: lv => `Launches ${1 + Math.floor(lv / 2)} homing missile(s) that blast on impact`,
+    desc: lv => { const n = 1 + Math.floor(lv / 2);
+      return `Launches ${n} homing missile${n > 1 ? 's' : ''} that blast${n > 1 ? '' : 's'} on impact`; },
     stats: lv => ({ cd: 1.5 - lv * 0.1, dmg: 16 + lv * 8, count: 1 + Math.floor(lv / 2), blast: 46 + lv * 6, speed: 260 }),
     fire(G, s) {
       for (let i = 0; i < s.count; i++) {

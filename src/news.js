@@ -1,7 +1,17 @@
 /** Version + patch notes. `NEWS[0]` is the current announcement; the rest is history. */
-export const VERSION = 'v0.7';
+export const VERSION = 'v0.8';
 
 export const NEWS = [
+  {
+    v: 'v0.8', title: 'Accuracy & Feel',
+    notes: [
+      'Fixed a big one: upgrading the Pulse Gun to Lv.3 made it <em>worse</em>. The two bolts were spread by a fixed angle, so past ~250px they straddled the target and both missed — inside the gun\'s own 400px range. Spread is now derived from a fixed gap at the target, so every bolt connects.',
+      'The soundtrack no longer opens with 20+ seconds of a lone bass note — the pulse layer is in from the first bar, and the full arrangement arrives by 110s instead of 150s.',
+      'Level-up cards now show their 1 / 2 / 3 key.',
+      'Patch notes are reachable from the pause menu, and the version badge flags a release you have not read yet.',
+      'Text fixes: "Fires 1 bolt(s)" and a dead upgrade tier that could never trigger.',
+    ],
+  },
   {
     v: 'v0.7', title: 'Audit & Polish',
     notes: [
