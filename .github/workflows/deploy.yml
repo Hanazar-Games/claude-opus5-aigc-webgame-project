@@ -23,6 +23,8 @@ jobs:
         with: { node-version: '20' }
       - name: Headless balance sim
         run: node tools/sim.mjs --runs 16 --assert-min 90 --assert-max 420
+      - name: Weapon bench
+        run: node tools/bench.mjs --seeds 12
 
   deploy:
     needs: balance

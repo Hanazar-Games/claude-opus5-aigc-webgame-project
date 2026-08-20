@@ -7,11 +7,11 @@ const ENEMY_CAP = 380;
 const CELL = 64;
 
 /** Knobs the balance sim can sweep (see `node tools/sim.mjs --sweep`). */
-export const TUNE = { hpDouble: 78 };
+export const TUNE = { hpDouble: 66, orbLag: 1.0 };
 
 export const G = {
   state: 'title',
-  time: 0, kills: 0, bossCount: 0, bossSpawns: 0, bossKills: 0,
+  time: 0, kills: 0, dmgDealt: 0, bossCount: 0, bossSpawns: 0, bossKills: 0,
   player: null,
   enemies: [], bullets: [], ebullets: [], orbs: [], pickups: [], parts: [], texts: [], novas: [],
   cam: { x: 0, y: 0, shake: 0 },
@@ -23,7 +23,7 @@ export const G = {
 
 /* ------------------------------------------------------------------- setup */
 export function newRun() {
-  G.time = 0; G.kills = 0; G.bossCount = 0; G.bossSpawns = 0; G.bossKills = 0; G.spawnAcc = 0; G.nextBoss = BOSS_INTERVAL;
+  G.time = 0; G.kills = 0; G.dmgDealt = 0; G.bossCount = 0; G.bossSpawns = 0; G.bossKills = 0; G.spawnAcc = 0; G.nextBoss = BOSS_INTERVAL;
   G.enemies.length = G.bullets.length = G.ebullets.length = 0;
   G.orbs.length = G.pickups.length = G.parts.length = G.texts.length = G.novas.length = 0;
   G.cam.x = G.cam.y = 0; G.cam.shake = 0;
@@ -133,6 +133,7 @@ function damageEnemy(e, dmg, canCrit = true) {
   if (e.dead) return;   // multi-hit frames (prism beams, nova) would kill it twice
   let d = dmg, crit = false;
   if (canCrit && random() < G.player.crit) { d *= 2; crit = true; }
+  G.dmgDealt += Math.min(d, e.hp);   // effective, not overkill
   e.hp -= d; e.flash = 0.1;
   if (crit) G.texts.push({ x: e.x, y: e.y - e.r, t: 0, v: Math.round(d), color: '#ffc44d' });
   if (e.hp <= 0) killEnemy(e);
@@ -425,20 +426,31 @@ export function update(dt) {
   G.cam.shake = Math.max(0, G.cam.shake - dt * 26);
 }
 
+/**
+ * Orbitals hit whatever is inside their ring, so their whole output depends on
+ * where the crowd is relative to you — and a player who kites keeps the crowd
+ * exactly outside it. Measured with tools/bench.mjs, Orbit Blades Lv.4 cleared
+ * 0.57 kills/s for the kiting bot and 3.08 for the one that ploughs straight in:
+ * a 5x swing on playstyle alone, with nothing in the game to tell you that.
+ * So the ring trails behind you while you move, sweeping the wake you are
+ * dragging the crowd through instead of the empty space ahead of you.
+ */
 function updateOrbitals(dt) {
   const p = G.player;
   for (const w of p.weapons) {
     const def = WEAPONS[w.id]; if (!def.orbital) continue;
     const s = def.stats(w.lv), R = s.radius * p.area;
+    const lag = R * TUNE.orbLag * p.moving;   // 1.0 keeps the ring's leading edge on the player
+    w.cx = p.x - Math.cos(p.dir) * lag; w.cy = p.y - Math.sin(p.dir) * lag;
     for (let i = 0; i < s.count; i++) {
       const a = w.angle + i * TAU / s.count;
-      const bx = p.x + Math.cos(a) * R, by = p.y + Math.sin(a) * R;
+      const bx = w.cx + Math.cos(a) * R, by = w.cy + Math.sin(a) * R;
       for (const e of queryGrid(bx, by, s.r + 26, _q)) {
         if (e.dead || e.orbCd > 0) continue;
         const rr = e.r + s.r;
         if ((e.x - bx) ** 2 + (e.y - by) ** 2 > rr * rr) continue;
         damageEnemy(e, s.dmg * p.damage);
-        e.orbCd = 0.32;
+        e.orbCd = s.hitCd * p.rate;
       }
     }
   }
@@ -533,6 +545,17 @@ export function rollCards() {
     pool.push({ kind: 'stat', id: s.id, icon: s.icon, name: s.name, desc: s.desc, weight: unlocks ? 12 : 3 });
   }
 
+  // Emergency Supply exists for the moment you are one hit from dying, so its
+  // weight tracks missing health: absent at full hp, a common offer below a third.
+  // It used to hang off an `if (!out.length)` fallback that cannot run — the pool
+  // always holds ten stat upgrades, so three cards always fill. Measured: it was
+  // offered 0 times in 27,000 card slots.
+  // Offered often enough to be a lifeline, damped hard by how many you have already
+  // taken: at a flat weight it stops being a lifeline and becomes a sustain engine,
+  // and 5 of 24 sim runs stopped being able to end at all.
+  const missing = 1 - p.hp / p.maxHp;
+  if (missing > 0.35) pool.push({ kind: 'stat', ...HEAL_CARD, weight: missing * 18 / (1 + (p.picks.heal || 0) * 1.5) });
+
   const out = [];
   const bag = pool.slice();
   while (out.length < 3 && bag.length) {
@@ -540,7 +563,6 @@ export function rollCards() {
     bag.splice(bag.indexOf(c), 1);
     out.push(c);
   }
-  if (!out.length) out.push({ kind: 'stat', ...HEAL_CARD, name: HEAL_CARD.name });
   return out;
 }
 

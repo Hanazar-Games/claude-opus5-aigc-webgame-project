@@ -13,6 +13,7 @@
 import { G, TUNE, update, newRun, rollCards, applyCard } from '../src/game.js';
 import { input } from '../src/input.js';
 import { setSeed } from '../src/util.js';
+import { BOTS } from './bots.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, def) => {
@@ -27,40 +28,6 @@ const CAP = +arg('cap', 600);              // seconds before we call it a win
 const [VW, VH] = arg('view', '900x620').split('x').map(Number);
 const STEP = 1 / 60;
 
-/* ----------------------------------------------------------------- movement */
-const BOTS = {
-  // Baseline: blind circling. Deliberately bad — a floor, not a target.
-  circle(p, t) {
-    const a = t * 0.8 + Math.sin(t * 0.37) * 1.6;
-    return { x: Math.cos(a), y: Math.sin(a) };
-  },
-  // Kite: flee the local threat field, drift toward loose XP, avoid orbiting
-  // in one spot. Rough stand-in for a competent human.
-  kite(p, t) {
-    let fx = 0, fy = 0;
-    for (const e of G.enemies) {
-      const dx = p.x - e.x, dy = p.y - e.y;
-      const d = Math.hypot(dx, dy);
-      if (d > 330 || d < 1) continue;
-      const w = (e.boss ? 2.5 : 1) * (330 - d) / 330 / d;
-      fx += dx * w; fy += dy * w;
-    }
-    const fl = Math.hypot(fx, fy);
-    if (fl > 0) { fx /= fl; fy /= fl; }
-    // pull toward the nearest orb that isn't in the danger direction
-    let ox = 0, oy = 0, bd = Infinity;
-    for (const o of G.orbs) {
-      const d = Math.hypot(o.x - p.x, o.y - p.y);
-      if (d < bd) { bd = d; ox = (o.x - p.x) / (d || 1); oy = (o.y - p.y) / (d || 1); }
-    }
-    const wander = t * 0.35;
-    let x = fx * 1.0 + ox * 0.45 + Math.cos(wander) * 0.2;
-    let y = fy * 1.0 + oy * 0.45 + Math.sin(wander) * 0.2;
-    const l = Math.hypot(x, y) || 1;
-    return { x: x / l, y: y / l };
-  },
-};
-
 /* ------------------------------------------------------------------- picks */
 const PICKERS = {
   random: cards => cards[(Math.random() * cards.length) | 0],
@@ -71,8 +38,9 @@ const PICKERS = {
   },
   // Breadth first (weapons beat stats), then deepen. Mirrors how people build.
   greedy(cards) {
-    const owned = G.player.weapons.length;
-    const rank = c => (c.kind === 'evo' ? 5 : c.kind === 'new' && owned < 4 ? 3 : c.kind === 'up' ? 2 : c.kind === 'new' ? 1.5 : 1);
+    const p = G.player, owned = p.weapons.length, hurt = p.hp / p.maxHp < 0.4;
+    const rank = c => (c.id === 'heal' && hurt ? 6 : c.kind === 'evo' ? 5 : c.kind === 'new' && owned < 4 ? 3
+      : c.kind === 'up' ? 2 : c.kind === 'new' ? 1.5 : 1);
     return cards.reduce((a, b) => (rank(b) > rank(a) ? b : a));
   },
 };

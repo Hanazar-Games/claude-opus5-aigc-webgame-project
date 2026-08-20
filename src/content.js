@@ -60,7 +60,10 @@ export const WEAPONS = {
     evo: { id: 'bladestorm', stat: 'speed' },
     name: 'Orbit Blades', icon: '🌀', max: 4,
     desc: lv => `${2 + Math.floor(lv / 2)} blades circling you, shredding anything close`,
-    stats: lv => ({ count: 2 + Math.floor(lv / 2), dmg: 9 + lv * 6, radius: 74 + lv * 7, spin: 2.4 + lv * 0.16, r: 12 }),
+    // hitCd is how long one enemy is immune after a blade connects. It is the real
+    // damage ceiling for an orbital — extra blades only widen coverage — so it has
+    // to come down with level, and it is what player attack rate scales.
+    stats: lv => ({ count: 2 + Math.floor(lv / 2), dmg: 9 + lv * 6, radius: 78 + lv * 9, spin: 2.4 + lv * 0.16, r: 11 + lv * 2, hitCd: 0.4 - lv * 0.04 }),
     orbital: true,
   },
 
@@ -68,7 +71,7 @@ export const WEAPONS = {
   railgun: {
     name: 'Starbreaker', icon: '🌠', max: 1, evolved: true, from: 'Pulse Gun + Weak Point Analysis',
     desc: () => 'One shot that tears through the entire field',
-    stats: () => ({ cd: 0.62, dmg: 130, pierce: 99, speed: 1500, w: 10 }),
+    stats: () => ({ cd: 0.55, dmg: 205, pierce: 99, speed: 1500, w: 10 }),
     fire(G, s) {
       const t = G.nearestEnemy(G.player, 700, 0, true); if (!t) return;
       const a = Math.atan2(t.y - G.player.y, t.x - G.player.x);
@@ -108,7 +111,7 @@ export const WEAPONS = {
   bladestorm: {
     name: 'Bladestorm', icon: '🌪', max: 1, evolved: true, from: 'Orbit Blades + Thrusters',
     desc: () => 'Eight massive blades forming a kill zone',
-    stats: () => ({ count: 8, dmg: 68, radius: 130, spin: 3.6, r: 17 }),
+    stats: () => ({ count: 8, dmg: 68, radius: 132, spin: 3.6, r: 20, hitCd: 0.18 }),
     orbital: true,
   },
 };

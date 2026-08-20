@@ -180,7 +180,7 @@ export function render(ctx, w, h, dpr) {
     for (let i = 0; i < s.count; i++) {
       const a = w2.angle + i * TAU / s.count;
       ctx.save();
-      ctx.translate(p.x + Math.cos(a) * R, p.y + Math.sin(a) * R);
+      ctx.translate((w2.cx ?? p.x) + Math.cos(a) * R, (w2.cy ?? p.y) + Math.sin(a) * R);
       ctx.rotate(a * 3);
       shape(ctx, 'diamond', s.r, t);
       ctx.fill(); ctx.stroke();
