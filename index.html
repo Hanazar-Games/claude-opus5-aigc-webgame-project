@@ -24,6 +24,14 @@
         <span id="kills">☠ 0</span>
       </div>
     </div>
+    <div id="act-track" class="act-track">
+      <div id="act-fill" class="act-fill"></div>
+      <span id="act-name">DEBRIS FIELD</span>
+    </div>
+    <div id="final-bar" class="final-bar hidden">
+      <span class="fb-name">THE DEVOURER</span>
+      <div class="fb-track"><div id="fb-fill" class="fb-fill"></div></div>
+    </div>
     <div id="loadout" class="loadout"></div>
     <button id="btn-pause" class="icon-btn" aria-label="Pause">II</button>
   </div>
@@ -32,7 +40,8 @@
     <div id="panel-title" class="panel">
       <h1 class="logo">STARFALL</h1>
       <p class="sub">S C A V E N G E R</p>
-      <p class="desc">Weapons fire themselves · You just move<br>Collect stardust, level up, evolve.<br>The longer you last, the hungrier the void gets.</p>
+      <p class="desc">Weapons fire themselves · You just move<br>Collect stardust, level up, evolve.<br>Survive four acts, then kill the thing at the end of them.</p>
+      <div id="diffs" class="diffs"></div>
       <button class="btn primary" data-action="start">START RUN</button>
       <button class="btn" data-action="news">WHAT'S NEW <span id="ver-badge" class="ver"></span></button>
       <div class="best">Best: <span id="best-title">--</span></div>
@@ -63,6 +72,22 @@
       <button class="btn primary" data-action="news-close">BACK</button>
     </div>
 
+    <div id="panel-win" class="panel hidden">
+      <h2 class="won">DEVOURER DOWN</h2>
+      <p id="w-diff" class="sub"></p>
+      <div class="result">
+        <div><b id="w-time">00:00</b><span>CLEAR TIME</span></div>
+        <div><b id="w-kills">0</b><span>KILLS</span></div>
+        <div><b id="w-level">1</b><span>LEVEL</span></div>
+      </div>
+      <div id="w-build" class="build"></div>
+      <div id="w-extra" class="extra"></div>
+      <div id="w-unlock"></div>
+      <div id="w-best" class="best"></div>
+      <button class="btn primary" data-action="start">RUN AGAIN</button>
+      <button class="btn" data-action="quit">TITLE</button>
+    </div>
+
     <div id="panel-over" class="panel hidden">
       <h2 class="dead">SIGNAL LOST</h2>
       <div class="result">
@@ -74,6 +99,7 @@
       <div id="r-extra" class="extra"></div>
       <div id="r-best" class="best"></div>
       <button class="btn primary" data-action="start">RUN AGAIN</button>
+      <button class="btn" data-action="quit">TITLE</button>
     </div>
   </div>
 

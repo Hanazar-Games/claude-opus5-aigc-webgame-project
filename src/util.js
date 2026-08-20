@@ -43,3 +43,7 @@ export function weightedPick(items) {
   for (const it of items) { r -= it.weight ?? 1; if (r <= 0) return it; }
   return items[items.length - 1];
 }
+
+/** 1_830_000 -> "1.83M". Run totals get large enough that raw digits stop reading. */
+export const fmtBig = n => n >= 1e6 ? (n / 1e6).toFixed(2) + 'M'
+  : n >= 1e4 ? Math.round(n / 1e3) + 'k' : Math.round(n).toString();

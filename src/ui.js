@@ -1,38 +1,46 @@
 import { G, applyCard, newRun } from './game.js';
-import { WEAPONS } from './content.js';
-import { fmtTime } from './util.js';
+import { WEAPONS, DIFFICULTIES, ACTS, FINAL_AT } from './content.js';
+import { fmtTime, fmtBig } from './util.js';
 import { sfx, unlockAudio, startMusic, stopMusic, setMusicPaused, setMuted, loadMuted, music } from './audio.js';
 import { VERSION, NEWS } from './news.js';
 
 const $ = id => document.getElementById(id);
 const el = {
   hud: $('hud'), overlay: $('overlay'),
-  title: $('panel-title'), levelup: $('panel-levelup'), pause: $('panel-pause'), over: $('panel-over'), news: $('panel-news'),
+  title: $('panel-title'), levelup: $('panel-levelup'), pause: $('panel-pause'),
+  over: $('panel-over'), win: $('panel-win'), news: $('panel-news'),
   hpFill: $('hp-fill'), hpText: $('hp-text'), xpFill: $('xp-fill'), xpText: $('xp-text'),
   timer: $('timer'), kills: $('kills'), loadout: $('loadout'), cards: $('cards'),
+  actTrack: $('act-track'), actFill: $('act-fill'), actName: $('act-name'),
+  finalBar: $('final-bar'), fbFill: $('fb-fill'), stage: $('stage'),
 };
 
-const BEST_KEY = 'starfall.best.v1';
+const BEST_KEY = 'starfall.best.v2';      // per difficulty, since v1.0 tiers
+const CLEAR_KEY = 'starfall.clears.v1';
 const SEEN_KEY = 'starfall.seenVersion';
-export const best = { time: 0, kills: 0, level: 1 };
 
-function loadBest() {
-  try { Object.assign(best, JSON.parse(localStorage.getItem(BEST_KEY)) || {}); } catch { }
-}
-function saveBest() {
-  try { localStorage.setItem(BEST_KEY, JSON.stringify(best)); } catch { }
-}
+export const best = {};                   // { [diffId]: { time, kills, level, won } }
+let clears = [];                          // difficulty ids the player has actually cleared
+let diff = 'veteran';
+
+const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } };
+const bestOf = id => best[id] || { time: 0, kills: 0, level: 1, won: false };
+const unlocked = id => id !== 'nightmare' || clears.includes('veteran');
 
 let prevPanel = 'title';
 function showPanel(name) {
-  for (const k of ['title', 'levelup', 'pause', 'over', 'news']) el[k].classList.toggle('hidden', k !== name);
+  for (const k of ['title', 'levelup', 'pause', 'over', 'win', 'news']) el[k].classList.toggle('hidden', k !== name);
   el.overlay.classList.toggle('hidden', !name);
   el.hud.classList.toggle('hidden', name === 'title');
 }
 
 export function initUI() {
-  loadBest();
-  $('best-title').textContent = best.time ? `${fmtTime(best.time)} · ☠${best.kills}` : '--';
+  Object.assign(best, load(BEST_KEY, {}));
+  clears = load(CLEAR_KEY, []);
+  diff = load('starfall.diff', 'veteran');
+  if (!unlocked(diff)) diff = 'veteran';
+  buildDiffs();
 
   buildNews();
   const badge = $('ver-badge');
@@ -47,9 +55,9 @@ export function initUI() {
     if (!btn) return;
     unlockAudio(); sfx.select();
     const a = btn.dataset.action;
-    if (a === 'start') { newRun(); showPanel(null); startMusic(); }
+    if (a === 'start') { startRun(); }
     else if (a === 'resume') { G.state = 'playing'; showPanel(null); setMusicPaused(false); }
-    else if (a === 'quit') { G.state = 'title'; showPanel('title'); stopMusic(); }
+    else if (a === 'quit') { G.state = 'title'; showPanel('title'); stopMusic(); buildDiffs(); }
     else if (a === 'news') {
       prevPanel = G.state === 'paused' ? 'pause' : 'title';
       showPanel('news');
@@ -81,7 +89,43 @@ export function initUI() {
 
   G.onLevelUp = showCards;
   G.onDeath = showGameOver;
+  G.onWin = showVictory;
+  G.onAct = showActBanner;
   showPanel('title');
+}
+
+function startRun() {
+  newRun(diff);
+  el.finalBar.classList.add('hidden');
+  el.actTrack.classList.remove('hidden');
+  showPanel(null);
+  startMusic();
+}
+
+function buildDiffs() {
+  $('diffs').innerHTML = DIFFICULTIES.map(d => {
+    const b = bestOf(d.id), ok = unlocked(d.id);
+    const line = !ok ? 'CLEAR VETERAN TO UNLOCK'
+      : clears.includes(d.id) ? `<span class="clear">✔ ${fmtTime(b.time)}</span>`
+      : b.time ? `best ${fmtTime(b.time)}` : d.desc;
+    return `<button class="diff${d.id === diff ? ' on' : ''}" data-diff="${d.id}"${ok ? '' : ' disabled'}>` +
+      `<b>${d.name}</b><small>${line}</small></button>`;
+  }).join('');
+  for (const b of $('diffs').children)
+    b.addEventListener('click', () => { diff = b.dataset.diff; save('starfall.diff', diff); buildDiffs(); });
+  const b = bestOf(diff);
+  $('best-title').textContent = b.time ? `${fmtTime(b.time)} · ☠${b.kills}` : '--';
+}
+
+/** Act turnover: a banner over the field, no pause — the fight does not stop. */
+function showActBanner(act) {
+  const final = act.t >= FINAL_AT;
+  const d = document.createElement('div');
+  d.className = 'act-banner' + (final ? ' final' : '');
+  d.innerHTML = `<b>${act.name}</b><i>${act.sub}</i>`;
+  el.stage.appendChild(d);
+  setTimeout(() => d.remove(), 3000);
+  if (final) { el.actTrack.classList.add('hidden'); el.finalBar.classList.remove('hidden'); }
 }
 
 export function togglePause() {
@@ -116,22 +160,50 @@ function showCards(cards) {
   showPanel('levelup');
 }
 
-function showGameOver() {
-  stopMusic();
-  $('r-time').textContent = fmtTime(G.time);
-  $('r-kills').textContent = G.kills;
-  $('r-level').textContent = G.player.level;
-  // final loadout + what the run actually achieved
-  $('r-build').innerHTML = G.player.weapons
+/**
+ * One renderer for both endings. A win records the clear time; a loss records how
+ * far you got — and a cleared tier always beats a longer failed run, so a 7:42
+ * defeat never displaces a 7:31 clear as your best.
+ */
+function fillResult(pre, won) {
+  $(pre + 'time').textContent = fmtTime(G.time);
+  $(pre + 'kills').textContent = G.kills;
+  $(pre + 'level').textContent = G.player.level;
+  $(pre + 'build').innerHTML = G.player.weapons
     .map(w => `<span class="wchip${WEAPONS[w.id].evolved ? ' evo' : ''}">${WEAPONS[w.id].icon} ${WEAPONS[w.id].name}${WEAPONS[w.id].evolved ? '' : ` Lv.${w.lv}`}</span>`)
     .join('');
   const evos = G.player.weapons.filter(w => WEAPONS[w.id].evolved).length;
-  $('r-extra').textContent = `${G.bossKills} mothership${G.bossKills === 1 ? '' : 's'} destroyed · ${evos} evolution${evos === 1 ? '' : 's'}`;
-  const isBest = G.time > (best.time || 0);
-  if (isBest) { best.time = G.time; best.kills = G.kills; best.level = G.player.level; saveBest(); }
-  $('r-best').textContent = isBest ? '★ NEW RECORD' : `Best: ${fmtTime(best.time)}`;
-  $('best-title').textContent = best.time ? `${fmtTime(best.time)} · ☠${best.kills}` : '--';
+  $(pre + 'extra').textContent = `${G.bossKills} mothership${G.bossKills === 1 ? '' : 's'} destroyed · ` +
+    `${evos} evolution${evos === 1 ? '' : 's'} · ${fmtBig(G.dmgDealt)} damage dealt`;
+
+  const b = bestOf(diff);
+  const better = won ? (!b.won || G.time < b.time) : (!b.won && G.time > b.time);
+  if (better) {
+    best[diff] = { time: G.time, kills: G.kills, level: G.player.level, won };
+    save(BEST_KEY, best);
+  }
+  const nb = bestOf(diff);
+  $(pre + 'best').textContent = better ? '★ NEW RECORD'
+    : `Best ${DIFFICULTIES.find(d => d.id === diff).name}: ${fmtTime(nb.time)}${nb.won ? ' ✔' : ''}`;
+  buildDiffs();
+}
+
+function showGameOver() {
+  stopMusic();
+  fillResult('r-', false);
   setTimeout(() => showPanel('over'), 700);
+}
+
+function showVictory() {
+  stopMusic();
+  const d = DIFFICULTIES.find(x => x.id === diff);
+  const first = !clears.includes(diff);
+  if (first) { clears.push(diff); save(CLEAR_KEY, clears); }
+  $('w-diff').textContent = d.name + ' CLEARED';
+  fillResult('w-', true);
+  $('w-unlock').innerHTML = first && diff === 'veteran' ? '<div class="unlock">NIGHTMARE UNLOCKED</div>' : '';
+  el.finalBar.classList.add('hidden');
+  setTimeout(() => showPanel('win'), 1100);
 }
 
 let lastLoadout = '';
@@ -152,7 +224,13 @@ export function syncHUD() {
   el.xpFill.style.width = Math.min(100, p.xp / p.xpNext * 100) + '%';
   el.xpText.textContent = `Lv.${p.level}`;
   el.timer.textContent = fmtTime(G.time);
-  music.intensity = 0.2 + 0.8 * Math.min(1, G.time / 110);
+  const arc = Math.min(1, G.time / FINAL_AT);
+  el.actFill.style.width = arc * 100 + '%';
+  el.actName.textContent = ACTS[G.act].name;
+  if (G.final) {
+    el.fbFill.style.width = Math.max(0, G.final.hp / G.final.maxHp) * 100 + '%';
+    music.intensity = 1;
+  } else music.intensity = 0.2 + 0.8 * Math.min(1, G.time / 150);
   el.kills.textContent = `☠ ${G.kills}`;
   syncLoadout();
 }

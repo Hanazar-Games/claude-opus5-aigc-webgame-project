@@ -1,5 +1,5 @@
 import { TAU, clamp, rand, random, pick, angleTo, weightedPick } from './util.js';
-import { WEAPONS, ENEMIES, SPAWN_TABLE, BOSS_INTERVAL, STAT_UPGRADES, HEAL_CARD } from './content.js';
+import { WEAPONS, ENEMIES, SPAWN_TABLE, BOSS_INTERVAL, STAT_UPGRADES, HEAL_CARD, FINAL_AT, ACTS, DIFFICULTIES } from './content.js';
 import { sfx } from './audio.js';
 import { readMove } from './input.js';
 
@@ -7,22 +7,25 @@ const ENEMY_CAP = 380;
 const CELL = 64;
 
 /** Knobs the balance sim can sweep (see `node tools/sim.mjs --sweep`). */
-export const TUNE = { hpDouble: 66, orbLag: 1.0 };
+export const TUNE = { hpDouble: 110, orbLag: 1.0, spawnRamp: 24, xpCurve: 0.16, finalHp: 175000, orbHome: 7, rageRamp: 95 };
 
 export const G = {
   state: 'title',
   time: 0, kills: 0, dmgDealt: 0, bossCount: 0, bossSpawns: 0, bossKills: 0,
+  diff: DIFFICULTIES[1], act: 0, final: null,
   player: null,
   enemies: [], bullets: [], ebullets: [], orbs: [], pickups: [], parts: [], texts: [], novas: [],
   cam: { x: 0, y: 0, shake: 0 },
   view: { w: 800, h: 600 },
   spawnAcc: 0, nextBoss: BOSS_INTERVAL,
   grid: new Map(),
-  onLevelUp: null, onDeath: null,
+  onLevelUp: null, onDeath: null, onWin: null, onAct: null,
 };
 
 /* ------------------------------------------------------------------- setup */
-export function newRun() {
+export function newRun(diffId = 'veteran') {
+  G.diff = DIFFICULTIES.find(d => d.id === diffId) || DIFFICULTIES[1];
+  G.act = 0; G.final = null;
   G.time = 0; G.kills = 0; G.dmgDealt = 0; G.bossCount = 0; G.bossSpawns = 0; G.bossKills = 0; G.spawnAcc = 0; G.nextBoss = BOSS_INTERVAL;
   G.enemies.length = G.bullets.length = G.ebullets.length = 0;
   G.orbs.length = G.pickups.length = G.parts.length = G.texts.length = G.novas.length = 0;
@@ -147,6 +150,13 @@ function killEnemy(e) {
   const n = e.boss ? 14 : e.elite ? 5 : 1;
   for (let i = 0; i < n; i++)
     G.orbs.push({ x: e.x + rand(20, -20), y: e.y + rand(20, -20), vx: rand(60, -60), vy: rand(60, -60), xp: e.xp / n, r: e.elite || e.boss ? 7 : 5 });
+  if (e.def.final) {
+    G.cam.shake = 34; sfx.boss();
+    burst(e.x, e.y, e.color, 90, 420);
+    G.state = 'won';
+    G.onWin?.();
+    return;
+  }
   if (e.boss) {
     G.bossKills++; G.cam.shake = 18; sfx.boss();
     dropPickup(e.x, e.y, 'heal'); dropPickup(e.x + 40, e.y, 'bomb');
@@ -209,26 +219,36 @@ function burst(x, y, color, n, spd) {
 }
 
 /* ------------------------------------------------------------------ spawns */
+/** Enemies arrive just past the corner of the screen, wherever that is. */
+const REF_RING = Math.hypot(900, 620) * 0.5 + 110;
+const spawnRing = () => Math.hypot(G.view.w, G.view.h) * 0.5 + 110;
+
 function spawnPoint() {
-  const a = rand(TAU);
-  const d = Math.hypot(G.view.w, G.view.h) * 0.5 + 110;
+  const a = rand(TAU), d = spawnRing();
   return { x: G.player.x + Math.cos(a) * d, y: G.player.y + Math.sin(a) * d };
 }
 
 function spawnEnemy(type, at, forceNormal = false) {
   const def = ENEMIES[type];
-  const t = G.time;
+  // Time-based scaling stops at FINAL_AT. The last fight is a designed encounter
+  // with its own escalation (the Devourer's rage), not one more tick of the curve;
+  // without the freeze, stalling it would make the chaff unsurvivable on its own.
+  const t = Math.min(G.time, FINAL_AT);
   // Player DPS compounds (damage% x rate% x crit x weapon levels x evolution),
   // so it grows roughly exponentially with pick count. Additive enemy HP could
   // never keep up, which is why strong builds ran away. Match the shape: HP
   // doubles every TUNE.hpDouble seconds.
-  const hpMult = Math.pow(2, t / TUNE.hpDouble) + (def.boss ? (G.bossCount - 1) * 0.75 : 0);
-  const dmgMult = 1 + t / 200;
+  // The Devourer's health is set outright rather than read off the time curve:
+  // it is the length of one designed fight, and it should not move every time the
+  // chaff curve is retuned.
+  const hpMult = def.final ? G.diff.hp
+    : (Math.pow(2, t / TUNE.hpDouble) + (def.boss ? (G.bossCount - 1) * 0.75 : 0)) * G.diff.hp;
+  const dmgMult = (1 + t / 200) * G.diff.dmg;
   const p = at || spawnPoint();
   // Elites: rare, fat, slow, worth a lot — they hand out the run's power spikes.
   // They also get steadily more common, which is most of the late-game pressure.
   const elite = !forceNormal && !def.boss && t > 45 && random() < 0.035 + t / 14000;
-  const hp = def.hp * hpMult * (elite ? 4 : 1);
+  const hp = (def.final ? TUNE.finalHp : def.hp) * hpMult * (elite ? 4 : 1);
   G.enemies.push({
     type, x: p.x, y: p.y, vx: 0, vy: 0, hp, maxHp: hp,
     r: def.r * (elite ? 1.5 : 1),
@@ -249,7 +269,21 @@ const AFFIXES = ['splitter', 'volley', 'haste'];
 
 function director(dt) {
   const t = G.time;
-  if (t >= G.nextBoss) {
+
+  while (G.act < ACTS.length - 1 && t >= ACTS[G.act + 1].t) {
+    G.act++;
+    G.onAct?.(ACTS[G.act]);
+    G.texts.push({ x: G.player.x, y: G.player.y - 88, t: 0, v: ACTS[G.act].name, color: '#4df3ff', big: true, life: 2.6 });
+  }
+
+  if (t >= FINAL_AT && !G.final) {
+    spawnEnemy('devourer', { x: G.player.x, y: G.player.y - 460 });
+    G.final = G.enemies[G.enemies.length - 1];
+    G.final.rage = 0; G.final.spiral = 0; G.final.burst = 0; G.final.summon = 6;
+    G.cam.shake = 26; sfx.boss();
+    return;                                   // no chaff wave on the frame it lands
+  }
+  if (!G.final && t >= G.nextBoss) {
     G.bossCount++;
     // Motherships are the only threat that scales with kill count, so tighten
     // their cadence over a run — this is what ends otherwise-unbounded games.
@@ -261,7 +295,14 @@ function director(dt) {
     sfx.boss();
   }
   const bossFight = G.enemies.some(e => e.boss);
-  const rate = (0.45 + t / 34) * (bossFight ? 0.5 : 1);   // ease the chaff during a boss
+  // Chaff eases off during any boss, and hard during the final fight — that one is
+  // about the Devourer, not about the crowd you happen to be standing in.
+  // Standing population is spawn rate x flight time, and flight time is the spawn
+  // ring, which is the screen. Left alone that made the same difficulty tier a
+  // different game per window: 77 enemies alive on a 900x620 desktop against 47 on
+  // a 420x780 phone, and a 31% win rate against 59%. Cancel the screen out.
+  const rate = (0.45 + Math.min(t, FINAL_AT) / TUNE.spawnRamp)
+    * (G.final ? 0.22 : bossFight ? 0.5 : 1) * G.diff.spawn * (REF_RING / spawnRing());
   G.spawnAcc += dt * rate;
   const table = SPAWN_TABLE.filter(r => t >= r[0]).map(r => ({ type: r[1], weight: r[2] }));
   while (G.spawnAcc >= 1) {
@@ -304,6 +345,7 @@ export function update(dt) {
   updateOrbitals(dt);
 
   /* enemies */
+  const cull = (spawnRing() + 380) ** 2;
   for (const e of G.enemies) {
     const a = angleTo(e, p);
     let ax = Math.cos(a), ay = Math.sin(a);
@@ -329,6 +371,8 @@ export function update(dt) {
       }
     }
 
+    if (e.def.final) updateDevourer(e, dt);
+
     if (e.def.shoot) {
       e.shootT += dt;
       if (e.shootT >= e.def.shoot.cd) {
@@ -348,8 +392,13 @@ export function update(dt) {
       if (!e.boss) { e.vx = Math.cos(a) * -260; e.vy = Math.sin(a) * -260; }  // bounce off, no instant re-hit
     }
 
-    // recycle far strays
-    if ((e.x - p.x) ** 2 + (e.y - p.y) ** 2 > 1000 * 1000 && !e.boss) {
+    // Recycle far strays. This radius MUST be derived from the spawn ring, not a
+    // constant: with the old flat 1000px, any window with a diagonal over ~1780px
+    // spawned enemies already outside it, and every one of them was teleported back
+    // to the ring every frame. On a maximised 1080p browser the game was unplayable
+    // — zero kills, zero level-ups — from v0.1 until this was measured, because
+    // every sim run and every screenshot had been taken at 900x620 or smaller.
+    if ((e.x - p.x) ** 2 + (e.y - p.y) ** 2 > cull && !e.boss) {
       const np = spawnPoint(); e.x = np.x; e.y = np.y;
     }
   }
@@ -396,7 +445,7 @@ export function update(dt) {
     o.age = (o.age || 0) + dt;
     // Inside the magnet radius (or once a straggler ages out) orbs are *driven*,
     // not nudged — a force-based pull stalls at the radius edge and never lands.
-    if (d < pr || o.age > 7) {
+    if (d < pr || o.age > TUNE.orbHome) {
       const sp = d < pr ? 300 + (1 - d / pr) * 800 : 300;
       o.vx = dx / d * sp; o.vy = dy / d * sp;
     } else { o.vx *= 0.93; o.vy *= 0.93; }
@@ -456,6 +505,48 @@ function updateOrbitals(dt) {
   }
 }
 
+/**
+ * The Devourer. Three things make this a fight instead of a fat Mothership:
+ * a spiral that forces you to keep moving rather than orbit, escorts from 66%
+ * that punish a build with no crowd clear, and a rage that grows with the fight
+ * clock — the last one is why the run is guaranteed to end. Stalling is not a
+ * strategy, it is just a slower loss.
+ */
+function updateDevourer(e, dt) {
+  const p = G.player;
+  const k = e.hp / e.maxHp;
+  e.rage = Math.min(1, (G.time - FINAL_AT) / TUNE.rageRamp);
+  e.phase = k < 0.33 ? 3 : k < 0.66 ? 2 : 1;
+  e.speed = e.def.speed * (1 + e.rage * 0.9 + (e.phase - 1) * 0.16);
+
+  const arms = 2 + e.phase;
+  e.spiral += dt * (1.5 + e.rage * 0.7);
+  e.burst -= dt;
+  if (e.burst <= 0) {
+    e.burst = Math.max(0.14, 0.3 - e.rage * 0.1 - (e.phase - 1) * 0.03);
+    for (let i = 0; i < arms; i++) {
+      const a = e.spiral + i * TAU / arms;
+      G.ebullets.push({ x: e.x + Math.cos(a) * e.r, y: e.y + Math.sin(a) * e.r,
+        vx: Math.cos(a) * 190, vy: Math.sin(a) * 190, r: 7,
+        dmg: 15 * G.diff.dmg * (1 + e.rage * 0.8), life: 6, color: '#ff2f6d' });
+    }
+  }
+
+  e.summon -= dt;
+  if (e.phase >= 2 && e.summon <= 0) {
+    e.summon = 10 - e.phase * 1.5;
+    for (let i = 0; i < 3 + e.phase; i++) {
+      const a = rand(TAU), d = 150 + rand(90);
+      spawnEnemy(e.phase >= 3 ? 'weaver' : 'spitter', { x: e.x + Math.cos(a) * d, y: e.y + Math.sin(a) * d }, true);
+    }
+    G.texts.push({ x: e.x, y: e.y - e.r - 20, t: 0, v: 'SPAWNING', color: '#ff2f6d', life: 1.2 });
+  }
+
+  // A slow inward pull, so backing off forever is not free either.
+  const a = angleTo(p, e), pull = 26 * e.rage * dt;
+  p.x += Math.cos(a) * pull; p.y += Math.sin(a) * pull;
+}
+
 /** Keep enemies from stacking into a single point. */
 function separate(dt) {
   const list = G.enemies;
@@ -494,7 +585,11 @@ function gainXp(n) {
   if (p.xp >= p.xpNext) {
     p.xp -= p.xpNext;
     p.level++;
-    p.xpNext = Math.floor(5 + p.level * 4 + p.level * p.level * 0.35);
+    // Exponential, so level responds to clear rate logarithmically. Under the old
+    // quadratic curve the run was a threshold: clear faster than they spawn and you
+    // snowballed to level 75, fall behind and you died at 180s, with nothing in
+    // between — a tenth of a point on the xp curve swung the win rate 0% to 58%.
+    p.xpNext = Math.floor(7 * Math.pow(1 + TUNE.xpCurve, p.level));
     p.hp = Math.min(p.maxHp, p.hp + 4);
     G.state = 'levelup';
     sfx.levelup();

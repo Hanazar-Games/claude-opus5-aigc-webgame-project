@@ -26,6 +26,20 @@ function shape(ctx, kind, r, t) {
     case 'star':
       for (let i = 0; i < 10; i++) { const a = i * TAU / 10, rr = i % 2 ? r * 0.48 : r; ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr); }
       ctx.closePath(); break;
+    // A slow, heavy maw: an inner ring of teeth counter-rotating against an outer
+    // shell, so at a glance it reads as a different order of thing to a Mothership.
+    case 'devourer': {
+      for (let i = 0; i < 14; i++) {
+        const a = i * TAU / 14 - t * 0.18, rr = r * (i % 2 ? 0.74 : 1);
+        ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr);
+      }
+      ctx.closePath();
+      for (let i = 0; i < 9; i++) {
+        const a = i * TAU / 9 + t * 0.5, rr = r * (i % 2 ? 0.2 : 0.5);
+        ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr);
+      }
+      ctx.closePath(); break;
+    }
     case 'boss': {
       for (let i = 0; i < 8; i++) {
         const a = i * TAU / 8 + t * 0.3, rr = r * (i % 2 ? 0.62 : 1);
@@ -119,6 +133,22 @@ export function render(ctx, w, h, dpr) {
     ctx.strokeStyle = flash ? '#ffffff' : e.elite ? '#ffd24d' : e.color;
     ctx.lineWidth = e.boss ? 3 : e.elite ? 3 : 2;
     if (e.boss || e.elite) { ctx.shadowBlur = e.boss ? 24 : 14; ctx.shadowColor = e.elite ? '#ffd24d' : e.color; }
+    if (e.def.final) {
+      // The last boss has to read as a different order of thing at a glance, not as
+      // a larger Mothership: a containment ring that tightens as it takes damage.
+      const k = Math.max(0, e.hp / e.maxHp);
+      ctx.lineWidth = 3; ctx.shadowBlur = 40;
+      for (let i = 0; i < 3; i++) {
+        ctx.globalAlpha = 0.22 + i * 0.12;
+        ctx.strokeStyle = i === 2 ? '#ffc44d' : '#a0208f';
+        ctx.beginPath();
+        ctx.arc(0, 0, e.r * (1.5 - i * 0.13) - (1 - k) * 22, t * (0.5 + i * 0.4) % TAU, t * (0.5 + i * 0.4) % TAU + TAU * 0.62);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = flash ? '#ffffff' : 'rgba(120,10,70,.55)';
+      ctx.strokeStyle = flash ? '#ffffff' : e.color;
+    }
     shape(ctx, e.shape, e.r, t);
     ctx.fill(); ctx.stroke();
     ctx.restore();
@@ -135,9 +165,10 @@ export function render(ctx, w, h, dpr) {
       ctx.globalAlpha = 1;
     }
     if (e.boss || e.elite) {
-      const bw = e.boss ? 90 : 44, k = Math.max(0, e.hp / e.maxHp);
+      const bw = e.def.final ? 190 : e.boss ? 90 : 44, k = Math.max(0, e.hp / e.maxHp);
       ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(e.x - bw / 2, e.y - e.r - 16, bw, 5);
-      ctx.fillStyle = e.boss ? '#ff4d5e' : '#ffd24d'; ctx.fillRect(e.x - bw / 2, e.y - e.r - 16, bw * k, 5);
+      ctx.fillStyle = e.def.final ? '#ff2f6d' : e.boss ? '#ff4d5e' : '#ffd24d';
+      ctx.fillRect(e.x - bw / 2, e.y - e.r - 16, bw * k, 5);
     }
   }
   ctx.shadowBlur = 0;
@@ -244,7 +275,7 @@ export function render(ctx, w, h, dpr) {
     ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-6, 6); ctx.lineTo(-6, -6); ctx.closePath(); ctx.fill();
     ctx.restore();
   };
-  for (const e of G.enemies) if (e.boss) marker(e.x, e.y, '#ff4d5e'); else if (e.elite) marker(e.x, e.y, '#ffd24d');
+  for (const e of G.enemies) if (e.boss) marker(e.x, e.y, e.def.final ? '#ff2f6d' : '#ff4d5e'); else if (e.elite) marker(e.x, e.y, '#ffd24d');
   for (const pk of G.pickups) marker(pk.x, pk.y, pk.kind === 'heal' ? '#5cff9d' : pk.kind === 'magnet' ? '#4df3ff' : '#ffc44d');
   ctx.globalAlpha = 1;
 

@@ -126,7 +126,35 @@ export const ENEMIES = {
   weaver: { name: 'Weaver', hp: 70, speed: 112, r: 14, dmg: 11, xp: 4, color: '#4df3ff', shape: 'star', orbitStrafe: true },
   boss: { name: 'Mothership', hp: 900, speed: 78, r: 44, dmg: 34, xp: 90, color: '#ff4d5e', shape: 'boss', boss: true,
     shoot: { cd: 2.0, speed: 165, dmg: 16, count: 12 } },
+  // The run ends on this thing, one way or the other. It does not use the shared
+  // `shoot` block — its patterns and phases live in game.js updateDevourer().
+  devourer: { name: 'The Devourer', hp: 34000, speed: 62, r: 78, dmg: 46, xp: 600,
+    color: '#ff2f6d', shape: 'devourer', boss: true, final: true },
 };
+
+/* -------------------------------------------------------------------- arcs */
+/**
+ * A run is a campaign, not an open-ended treadmill. Four acts, then The Devourer
+ * at FINAL_AT — kill it and the run is won. Every previous version of this game
+ * could only end by killing you, which is why five balance passes in a row were
+ * spent stopping strong builds from running forever: an endless mode has to be
+ * held down by numbers, an arc ends because it was designed to.
+ */
+export const FINAL_AT = 420;
+
+export const ACTS = [
+  { t: 0, name: 'DEBRIS FIELD', sub: 'Scavenge what the void left behind' },
+  { t: 130, name: 'THE HUNT', sub: 'Something noticed you' },
+  { t: 270, name: 'SWARM TIDE', sub: 'They stop arriving one at a time' },
+  { t: FINAL_AT, name: 'THE DEVOURER', sub: 'It has been waiting the whole run' },
+];
+
+/** Enemy scaling multipliers per tier. `spawn` scales the director's rate. */
+export const DIFFICULTIES = [
+  { id: 'recruit', name: 'RECRUIT', desc: 'A shorter climb to the Devourer', hp: 0.62, dmg: 0.76, spawn: 0.86 },
+  { id: 'veteran', name: 'VETERAN', desc: 'The intended fight', hp: 1, dmg: 1, spawn: 1 },
+  { id: 'nightmare', name: 'NIGHTMARE', desc: 'For a build that already works', hp: 1.45, dmg: 1.22, spawn: 1.15 },
+];
 
 // [startTime, type, weight] — director samples from entries unlocked at time t.
 export const SPAWN_TABLE = [
@@ -137,7 +165,7 @@ export const SPAWN_TABLE = [
   [110, 'weaver', 4],
   [150, 'brute', 4],
   [200, 'darter', 8],
-  // Late game leans on ranged attackers: an evolved build clears its own radius,
+  // Act III leans on ranged attackers: an evolved build clears its own radius,
   // so melee chaff stops mattering and only bullets still threaten the player.
   [210, 'spitter', 10],
   [270, 'weaver', 10],
@@ -147,17 +175,25 @@ export const SPAWN_TABLE = [
 export const BOSS_INTERVAL = 90; // seconds
 
 /* ----------------------------------------------------------------- upgrades */
+/**
+ * Stat upgrades stack ADDITIVELY, not multiplicatively. Twenty compounding +15%
+ * damage picks is 16x; twenty additive ones is 4x. The compounding version is why
+ * every balance pass since v0.3 ended up fighting the same runaway — player power
+ * grew exponentially in level, so a two-level swing decided a whole run and the
+ * enemy curve had to be knife-edged to contain it. Rate and armour use 1/(1+kn)
+ * for the same reason: a multiplier that can be driven toward zero cannot be tuned.
+ */
 export const STAT_UPGRADES = [
-  { id: 'dmg', icon: '🗡', name: 'Overload', desc: '+15% damage to everything', apply: p => p.damage *= 1.15 },
-  { id: 'rate', icon: '⏱', name: 'Rapid Cycling', desc: '-11% time between attacks', apply: p => p.rate *= 0.89 },
-  { id: 'speed', icon: '👟', name: 'Thrusters', desc: '+11% movement speed', apply: p => p.speed *= 1.11 },
-  { id: 'hp', icon: '❤', name: 'Plating', desc: '+25 max HP, and heal for it', apply: p => { p.maxHp += 25; p.hp += 25; } },
-  { id: 'regen', icon: '✚', name: 'Nanorepair', desc: 'Regenerate +0.6 HP per second', apply: p => p.regen += 0.6 },
-  { id: 'armor', icon: '🛡', name: 'Deflectors', desc: '-12% damage taken', apply: p => p.armor *= 0.88 },
-  { id: 'pickup', icon: '🧲', name: 'Mag Coil', desc: '+35% pickup range', apply: p => p.pickup *= 1.35 },
-  { id: 'crit', icon: '🎯', name: 'Weak Point Analysis', desc: '+8% crit chance (double damage)', apply: p => p.crit += 0.08 },
-  { id: 'area', icon: '🌐', name: 'Field Expansion', desc: '+14% area of effect', apply: p => p.area *= 1.14 },
-  { id: 'xp', icon: '⭐', name: 'Data Mining', desc: '+18% XP gained', apply: p => p.xpMult *= 1.18 },
+  { id: 'dmg', icon: '🗡', name: 'Overload', desc: '+18% damage to everything', apply: p => p.damage += 0.18 },
+  { id: 'rate', icon: '⏱', name: 'Rapid Cycling', desc: 'Fire faster', apply: p => { p.rateN = (p.rateN || 0) + 1; p.rate = 1 / (1 + 0.14 * p.rateN); } },
+  { id: 'speed', icon: '👟', name: 'Thrusters', desc: '+16 movement speed', apply: p => p.speed += 16 },
+  { id: 'hp', icon: '❤', name: 'Plating', desc: '+28 max HP, and heal for it', apply: p => { p.maxHp += 28; p.hp += 28; } },
+  { id: 'regen', icon: '✚', name: 'Nanorepair', desc: 'Regenerate +0.7 HP per second', apply: p => p.regen += 0.7 },
+  { id: 'armor', icon: '🛡', name: 'Deflectors', desc: 'Take less damage', apply: p => { p.armorN = (p.armorN || 0) + 1; p.armor = 1 / (1 + 0.16 * p.armorN); } },
+  { id: 'pickup', icon: '🧲', name: 'Mag Coil', desc: '+40 pickup range', apply: p => p.pickup += 40 },
+  { id: 'crit', icon: '🎯', name: 'Weak Point Analysis', desc: '+9% crit chance (double damage)', apply: p => p.crit += 0.09 },
+  { id: 'area', icon: '🌐', name: 'Field Expansion', desc: '+16% area of effect', apply: p => p.area += 0.16 },
+  { id: 'xp', icon: '⭐', name: 'Data Mining', desc: '+20% XP gained', apply: p => p.xpMult += 0.2 },
 ];
 
 export const HEAL_CARD = { id: 'heal', icon: '🍀', name: 'Emergency Supply', desc: 'Instantly restore 40% HP', apply: p => { p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.4); } };

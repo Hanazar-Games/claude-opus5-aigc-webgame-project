@@ -4,13 +4,20 @@
  *
  *   node tools/sim.mjs                       # default: 24 runs, kite bot, greedy picks
  *   node tools/sim.mjs --runs 60 --bot circle --picks random
+ *   node tools/sim.mjs --diff nightmare      # recruit | veteran | nightmare
  *   node tools/sim.mjs --view 420x780        # phone-shaped viewport
+ *
+ * Since v1.0 a run is a campaign that can be won, so the headline number is the
+ * WIN RATE, not survival time. Survival time was only ever a proxy for difficulty
+ * and it was a bad one: it could not tell "died at 300s on the way up" from
+ * "died at 300s to the final boss", and those two want opposite fixes.
  *
  * The game logic has no DOM dependency and all randomness routes through
  * util.setSeed(), so a given seed replays exactly. Use this to check whether a
  * balance change actually moved the numbers instead of eyeballing the canvas.
  */
 import { G, TUNE, update, newRun, rollCards, applyCard } from '../src/game.js';
+import { ACTS, FINAL_AT } from '../src/content.js';
 import { input } from '../src/input.js';
 import { setSeed } from '../src/util.js';
 import { BOTS } from './bots.mjs';
@@ -24,7 +31,8 @@ const arg = (name, def) => {
 const RUNS = +arg('runs', 24);
 const BOT = arg('bot', 'kite');
 const PICKS = arg('picks', 'greedy');
-const CAP = +arg('cap', 600);              // seconds before we call it a win
+const DIFF = arg('diff', 'veteran');
+const CAP = +arg('cap', 900);              // hard stop; a run that hits this is a bug
 const [VW, VH] = arg('view', '900x620').split('x').map(Number);
 const STEP = 1 / 60;
 
@@ -49,7 +57,7 @@ const PICKERS = {
 function runOne(seed) {
   setSeed(seed);
   G.view.w = VW; G.view.h = VH;
-  newRun();
+  newRun(DIFF);
   const move = BOTS[BOT], pickCard = PICKERS[PICKS];
   const maxSteps = CAP * 60;
   let peak = 0, visSum = 0, visN = 0;
@@ -73,7 +81,8 @@ function runOne(seed) {
   }
   input.x = input.y = 0;
   return {
-    time: G.time, kills: G.kills, level: G.player.level,
+    time: G.time, kills: G.kills, level: G.player.level, won: G.state === 'won',
+    act: G.act, finalHp: G.final ? Math.max(0, G.final.hp / G.final.maxHp) : 1,
     bossSpawned: G.bossSpawns, bossKilled: G.bossKills,
     weapons: G.player.weapons.map(w => `${w.id}${w.lv}`).join(' '),
     visible: visSum / Math.max(1, visN), peak,
@@ -89,15 +98,15 @@ const sweep = arg('sweep', null);
 if (sweep) {
   const [key, ...vals] = sweep.split(',');
   console.log(`\n  sweep ${key} · ${RUNS} runs each · bot=${BOT} picks=${PICKS} cap=${CAP}s\n`);
-  console.log('  value   p25     median  p75     lvl  bossK  cap');
+  console.log('  value   win%    p25     median  p75     lvl  reached-final');
   for (const v of vals) {
     TUNE[key] = +v;
     const rs = [];
     for (let s = 1; s <= RUNS; s++) rs.push(runOne(s));
     const ts = rs.map(r => r.time), lv = rs.map(r => r.level);
-    console.log(`  ${String(v).padEnd(7)} ${f1(q(ts, .25)).padEnd(7)} ${f1(q(ts, .5)).padEnd(7)} ${f1(q(ts, .75)).padEnd(7)} ` +
-      `${String(q(lv, .5)).padEnd(4)} ${String(rs.reduce((a, r) => a + r.bossKilled, 0)).padEnd(6)} ` +
-      `${rs.filter(r => r.time >= CAP - 0.5).length}/${RUNS}`);
+    const w = rs.filter(r => r.won).length, fin = rs.filter(r => r.act >= ACTS.length - 1).length;
+    console.log(`  ${String(v).padEnd(7)} ${(f1(w / RUNS * 100) + '%').padEnd(7)} ${f1(q(ts, .25)).padEnd(7)} ${f1(q(ts, .5)).padEnd(7)} ${f1(q(ts, .75)).padEnd(7)} ` +
+      `${String(q(lv, .5)).padEnd(4)} ${fin}/${RUNS}`);
   }
   console.log('');
   process.exit(0);
@@ -108,16 +117,28 @@ for (let s = 1; s <= RUNS; s++) results.push(runOne(s));
 
 const times = results.map(r => r.time);
 const levels = results.map(r => r.level);
-const survived = results.filter(r => r.time >= CAP - 0.5).length;
+const wins = results.filter(r => r.won);
+const reachedFinal = results.filter(r => r.act >= ACTS.length - 1);
+const pct = n => f1(n / RUNS * 100) + '%';
 
-console.log(`\n  sim: ${RUNS} runs · bot=${BOT} · picks=${PICKS} · view=${VW}x${VH} · cap=${CAP}s\n`);
-console.log(`  survival   p25 ${f1(q(times, .25))}s   median ${f1(q(times, .5))}s   p75 ${f1(q(times, .75))}s   max ${f1(Math.max(...times))}s`);
+console.log(`\n  sim: ${RUNS} runs · ${DIFF} · bot=${BOT} · picks=${PICKS} · view=${VW}x${VH}\n`);
+console.log(`  WON        ${wins.length}/${RUNS}  (${pct(wins.length)})` +
+  (wins.length ? `   clear ${f1(q(wins.map(r => r.time), .5))}s, of which ` +
+    `${f1(q(wins.map(r => r.time - FINAL_AT), .5))}s was the Devourer` : ''));
+console.log(`  reached    ${reachedFinal.length}/${RUNS} got to the Devourer at ${FINAL_AT}s`);
+if (reachedFinal.length > wins.length) {
+  const lost = reachedFinal.filter(r => !r.won);
+  console.log(`             the ${lost.length} that lost there left it at ` +
+    `${f1(q(lost.map(r => r.finalHp * 100), .5))}% hp (median)`);
+}
+console.log(`  died in    ` + ACTS.map((a, i) =>
+  `${a.name.toLowerCase()} ${results.filter(r => !r.won && r.act === i).length}`).join(' · '));
+console.log(`  survival   p25 ${f1(q(times, .25))}s   median ${f1(q(times, .5))}s   p75 ${f1(q(times, .75))}s`);
 console.log(`  level      p25 ${q(levels, .25)}      median ${q(levels, .5)}      p75 ${q(levels, .75)}`);
 console.log(`  kills      median ${q(results.map(r => r.kills), .5)}`);
 console.log(`  boss       spawned ${results.reduce((a, r) => a + r.bossSpawned, 0)}  killed ${results.reduce((a, r) => a + r.bossKilled, 0)}`);
 console.log(`  on-screen  ${f1(results.reduce((a, r) => a + r.visible, 0) / RUNS)} enemies avg`);
-console.log(`  perf       peak update ${f1(Math.max(...results.map(r => r.peak)))}ms`);
-console.log(`  reached cap ${survived}/${RUNS}\n`);
+console.log(`  perf       peak update ${f1(Math.max(...results.map(r => r.peak)))}ms\n`);
 
 // weapon popularity, to spot picks that never get taken
 const wc = {};
@@ -137,14 +158,17 @@ for (const [i, r] of results.entries()) {
   if (r.time < 0 || !Number.isFinite(r.time)) bad.push(`seed ${seed}: bogus run time ${r.time}`);
   if (r.level < 1) bad.push(`seed ${seed}: level ${r.level} below start`);
   if (r.kills < 0) bad.push(`seed ${seed}: negative kills ${r.kills}`);
+  if (r.won && r.time < FINAL_AT) bad.push(`seed ${seed}: won at ${f1(r.time)}s, before the Devourer spawns`);
+  if (r.time >= CAP - 0.5) bad.push(`seed ${seed}: run never ended (${CAP}s hard stop) — the arc is not terminating`);
 }
 if (bad.length) {
   console.error('FAIL: invariant violated\n  ' + bad.slice(0, 5).join('\n  '));
   process.exit(1);
 }
 
-/* CI guard: a balance edit that tanks or trivialises the game should fail loudly. */
-const min = +arg('assert-min', 0), max = +arg('assert-max', 0);
-const med = q(times, .5);
-if (min && med < min) { console.error(`FAIL: median survival ${f1(med)}s < ${min}s`); process.exit(1); }
-if (max && med > max) { console.error(`FAIL: median survival ${f1(med)}s > ${max}s`); process.exit(1); }
+/* CI guard. A campaign has one number worth gating on: can a competent player
+   clear it, and not every time. */
+const wmin = +arg('assert-win-min', 0), wmax = +arg('assert-win-max', 0);
+const wr = wins.length / RUNS * 100;
+if (wmin && wr < wmin) { console.error(`FAIL: win rate ${f1(wr)}% < ${wmin}%`); process.exit(1); }
+if (wmax && wr > wmax) { console.error(`FAIL: win rate ${f1(wr)}% > ${wmax}%`); process.exit(1); }

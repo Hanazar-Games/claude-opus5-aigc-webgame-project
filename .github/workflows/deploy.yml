@@ -21,8 +21,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - name: Headless balance sim
-        run: node tools/sim.mjs --runs 16 --assert-min 90 --assert-max 420
+      # A campaign has one number worth gating on: can a competent player clear it,
+      # and not every time. Recruit must be winnable, Nightmare must not be a formality.
+      - name: Campaign win rate — veteran
+        run: node tools/sim.mjs --runs 24 --diff veteran --assert-win-min 8 --assert-win-max 45
+      - name: Campaign win rate — recruit
+        run: node tools/sim.mjs --runs 16 --diff recruit --assert-win-min 40
+      - name: Campaign win rate — nightmare
+        run: node tools/sim.mjs --runs 16 --diff nightmare --assert-win-max 30
+      # Every sim run and screenshot for nine versions was taken at 900x620, and a
+      # hard-coded cull radius made the game unplayable above a ~1780px diagonal.
+      # Never again: the biggest common desktop window is gated too.
+      - name: Playable on a large display
+        run: node tools/sim.mjs --runs 16 --view 1920x1080 --assert-win-min 3
+      - name: Playable on a phone
+        run: node tools/sim.mjs --runs 16 --view 420x780 --assert-win-min 10 --assert-win-max 70
       - name: Weapon bench
         run: node tools/bench.mjs --seeds 12
 
