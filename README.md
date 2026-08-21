@@ -61,7 +61,9 @@ it built. Holding it costs you two things:
 - **the reactor** — your weapons fire ~45% slower for the whole strip
 - **the beacon** — reinforcements arrive around the *wreck*, not around you
 
-Finish it and you draw one of eight **modules**, which never appear in a level-up:
+Finish it and you draw one of eight **modules**, which never appear in a level-up.
+What you are holding is shown next to your weapons in the HUD, on the salvage
+draw, and on the results screen:
 
 | Module | Effect |
 | --- | --- |

@@ -1,6 +1,6 @@
 import { G, update } from './game.js';
 import { render, seedStars } from './render.js';
-import { initUI, syncHUD, togglePause } from './ui.js';
+import { initUI, syncHUD, togglePause, guardPanels } from './ui.js';
 import { initInput, input } from './input.js';
 import { unlockAudio, setMusicPaused } from './audio.js';
 
@@ -46,7 +46,7 @@ function frame(now) {
     let guard = 0;
     while (acc >= STEP && guard++ < 6) { update(STEP); acc -= STEP; if (G.state !== 'playing') break; }
     syncHUD();
-  } else acc = 0;
+  } else { acc = 0; guardPanels(); }
 
   render(ctx, W, H, dpr);
 }

@@ -1,5 +1,5 @@
 import { G, applyCard, applyModule, newRun } from './game.js';
-import { WEAPONS, DIFFICULTIES, ACTS, FINAL_AT } from './content.js';
+import { WEAPONS, MODULES, DIFFICULTIES, ACTS, FINAL_AT } from './content.js';
 import { fmtTime, fmtBig } from './util.js';
 import { sfx, unlockAudio, startMusic, stopMusic, setMusicPaused, setMusicFinal, salvageHum, setMuted, loadMuted, music } from './audio.js';
 import { VERSION, NEWS } from './news.js';
@@ -167,15 +167,40 @@ function buildNews() {
   $('news-old').innerHTML = NEWS.slice(1).map(entryHTML).join('');
 }
 
+/**
+ * Answering a modal hands control back to the game — but the game may immediately
+ * raise the NEXT queued one, which shows its own panel. Blindly calling
+ * showPanel(null) afterwards hid that panel while the state stayed modal: no
+ * overlay, no cards, and main.js refusing to step because the state was not
+ * 'playing'. A hard freeze with no way out but a reload, reachable precisely when
+ * the v1.1 modal queue did its job.
+ */
+function dismiss() { if (G.state === 'playing') showPanel(null); }
+
+/**
+ * Safety net for the whole class, run every frame. A modal game state with no
+ * panel on screen is unrecoverable — main.js will not step, and pause is disabled
+ * during a modal — so if the two ever disagree again, re-raise instead of freezing.
+ */
+export function guardPanels() {
+  const want = G.state === 'levelup' ? 'levelup' : G.state === 'salvage' ? 'salvage' : null;
+  if (!want || !G.offer || !el[want].classList.contains('hidden')) return;
+  if (want === 'levelup') showCards(G.offer); else showModules(G.offer);
+}
+
 /** Salvage draw. Same shape as a level-up, deliberately a different colour. */
 function showModules(mods) {
+  // What you already hold, so the choice is made against the build rather than blind
+  $('mods-held').innerHTML = G.player.modules.length
+    ? 'INSTALLED  ' + G.player.modules.map(id => `<span title="${modDef(id).name}">${modDef(id).icon}</span>`).join(' ')
+    : '';
   el.mods.innerHTML = '';
   for (const m of mods) {
     const d = document.createElement('button');
     d.className = 'card mod';
     d.innerHTML = `<kbd>${mods.indexOf(m) + 1}</kbd><div class="ico">${m.icon}</div>` +
       `<div><h3>${m.name}</h3><p>${m.desc}</p></div>`;
-    d.addEventListener('click', () => { sfx.select(); applyModule(m); showPanel(null); });
+    d.addEventListener('click', () => { sfx.select(); applyModule(m); dismiss(); });
     el.mods.appendChild(d);
   }
   showPanel('salvage');
@@ -192,7 +217,7 @@ function showCards(cards) {
     const from = c.kind === 'evo' ? `<em>${WEAPONS[c.id].from}</em>` : '';
     d.innerHTML = `<kbd>${cards.indexOf(c) + 1}</kbd><div class="ico">${c.icon}</div>` +
       `<div><h3>${c.name}${tag}</h3><p>${c.desc}${from}</p></div>`;
-    d.addEventListener('click', () => { sfx.select(); applyCard(c); showPanel(null); syncLoadout(); });
+    d.addEventListener('click', () => { sfx.select(); applyCard(c); dismiss(); syncLoadout(); });
     el.cards.appendChild(d);
   }
   showPanel('levelup');
@@ -210,6 +235,8 @@ function fillResult(pre, won) {
   $(pre + 'build').innerHTML = G.player.weapons
     .map(w => `<span class="wchip${WEAPONS[w.id].evolved ? ' evo' : ''}">${WEAPONS[w.id].icon} ${WEAPONS[w.id].name}${WEAPONS[w.id].evolved ? '' : ` Lv.${w.lv}`}</span>`)
     .join('');
+  $(pre + 'mods').innerHTML = G.player.modules
+    .map(id => `<span class="wchip mod">${modDef(id).icon} ${modDef(id).name}</span>`).join('');
   const evos = G.player.weapons.filter(w => WEAPONS[w.id].evolved).length;
   $(pre + 'extra').textContent = `${G.bossKills} mothership${G.bossKills === 1 ? '' : 's'} destroyed · ` +
     `${evos} evolution${evos === 1 ? '' : 's'} · ${G.salvaged} derelict${G.salvaged === 1 ? '' : 's'} stripped · ` +
@@ -246,13 +273,22 @@ function showVictory() {
   setTimeout(() => showPanel('win'), 1100);
 }
 
+const modDef = id => MODULES.find(m => m.id === id);
+
 let lastLoadout = '';
 function syncLoadout() {
-  const key = G.player.weapons.map(w => w.id + w.lv).join();
+  const p = G.player;
+  const key = p.weapons.map(w => w.id + w.lv).join() + '|' + p.modules.join();
   if (key === lastLoadout) return;
   lastLoadout = key;
-  el.loadout.innerHTML = G.player.weapons
-    .map(w => `<div class="slot" title="${WEAPONS[w.id].name}">${WEAPONS[w.id].icon}<i>${w.lv}</i></div>`).join('');
+  // Modules were invisible once taken — nothing in the run told you what you were
+  // holding, for the one system whose whole point is that it changes a rule.
+  el.loadout.innerHTML = p.weapons
+    .map(w => `<div class="slot" title="${WEAPONS[w.id].name}">${WEAPONS[w.id].icon}<i>${w.lv}</i></div>`).join('')
+    + p.modules.map(id => {
+      const m = modDef(id);
+      return `<div class="slot mod" title="${m.name} — ${m.desc}">${m.icon}</div>`;
+    }).join('');
 }
 
 export function syncHUD() {
@@ -264,6 +300,7 @@ export function syncHUD() {
   el.xpFill.style.width = Math.min(100, p.xp / p.xpNext * 100) + '%';
   el.xpText.textContent = `Lv.${p.level}`;
   el.timer.textContent = fmtTime(G.time);
+  const hulk = G.hulks.find(h => h.active);
   const arc = Math.min(1, G.time / FINAL_AT);
   el.actFill.style.width = arc * 100 + '%';
   el.actName.textContent = ACTS[G.act].name;
@@ -271,8 +308,10 @@ export function syncHUD() {
     el.fbFill.style.width = Math.max(0, G.final.hp / G.final.maxHp) * 100 + '%';
     music.intensity = 1;
   } else music.intensity = 0.2 + 0.8 * Math.min(1, G.time / 150);
+  // The tensest seconds in the run had no musical answer at all: hold the
+  // arrangement up while a wreck is being stripped, then let it fall back.
+  if (hulk && !G.final) music.intensity = Math.max(music.intensity, 0.9);
   el.kills.textContent = `☠ ${G.kills}`;
-  const hulk = G.hulks.find(h => h.active);
   salvageHum(!!hulk, hulk ? hulk.p : 0);
   el.salvHud.textContent = hulk ? `SALVAGING  ${Math.round(hulk.p * 100)}%  ·  HOLD POSITION` : '';
   syncLoadout();

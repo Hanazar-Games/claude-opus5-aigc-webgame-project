@@ -125,7 +125,9 @@ export function render(ctx, w, h, dpr) {
 
   /* derelict hulks — the only thing on the field you have to stand still for */
   for (const hk of G.hulks) {
-    const fade = Math.min(1, (DERELICT.life - hk.t) / 5);            // dims as it drifts off
+    // clamped: a negative globalAlpha is silently ignored by canvas, which would
+    // leave every later draw at whatever alpha happened to be set last
+    const fade = clamp((DERELICT.life - hk.t) / 5, 0, 1);            // dims as it drifts off
     const c = hk.active ? '#ffc44d' : '#c9a24a';
     ctx.save();
     ctx.globalAlpha = 0.85 * fade;

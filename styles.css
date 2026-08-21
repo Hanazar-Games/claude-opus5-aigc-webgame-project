@@ -27,7 +27,10 @@ canvas{display:block;width:100%;height:100%;image-rendering:auto}
   text-shadow:0 0 8px rgba(77,243,255,.5)}
 #timer{font-size:20px;font-weight:700;color:var(--cyan)}
 #kills{color:var(--dim)}
-.loadout{position:absolute;left:12px;bottom:max(12px,env(safe-area-inset-bottom));display:flex;gap:6px}
+.loadout{position:absolute;left:12px;bottom:max(12px,env(safe-area-inset-bottom));display:flex;gap:6px;
+  /* Five weapons plus eight modules is thirteen tiles: on a 375px screen that ran
+     off the edge and under the pause button. Wrap upward, and stay clear of it. */
+  flex-wrap:wrap-reverse;max-width:calc(100% - 84px);align-content:flex-end}
 .slot{width:36px;height:36px;border:1px solid var(--line);border-radius:9px;background:rgba(10,14,28,.7);
   display:grid;place-items:center;font-size:17px;position:relative}
 .slot i{position:absolute;right:2px;bottom:0;font-size:9px;font-style:normal;color:var(--amber)}
@@ -174,6 +177,10 @@ h2.salv{color:var(--amber);text-shadow:0 0 22px rgba(255,196,77,.45)}
 .card.mod{border-color:rgba(255,196,77,.42);background:linear-gradient(90deg,rgba(255,196,77,.09),rgba(255,196,77,.02))}
 .card.mod:hover{border-color:var(--amber);background:rgba(255,196,77,.16)}
 .card.mod h3{color:var(--amber)}
+.slot.mod{width:28px;height:28px;font-size:14px;border-color:rgba(255,196,77,.5);background:rgba(255,196,77,.1)}
+.wchip.mod{border-color:rgba(255,196,77,.45);color:var(--amber)}
+.held{margin-top:12px;font-size:11px;letter-spacing:2px;color:var(--dim)}
+.held span{font-size:15px;letter-spacing:0}
 .salv-hud{position:absolute;left:0;right:0;bottom:74px;text-align:center;pointer-events:none;
   font-size:10px;letter-spacing:4px;color:var(--amber);text-shadow:0 0 12px rgba(255,196,77,.5)}
 .unlock{margin-top:12px;padding:9px;border-radius:10px;font-size:11px;letter-spacing:1px;

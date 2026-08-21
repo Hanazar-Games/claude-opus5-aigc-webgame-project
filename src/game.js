@@ -212,7 +212,7 @@ function hurtPlayer(dmg) {
   p.invuln = 0.7;
   G.cam.shake = Math.max(G.cam.shake, 9);
   sfx.hurt();
-  if (p.reactive) G.novaBlast(p.x, p.y, 150 + p.reactive * 40, 45 + G.time * 0.9, 300);
+  if (p.reactive) G.novaBlast(p.x, p.y, 150 + p.reactive * 40, 45 + scaleT() * 0.9, 300);
   if (p.hp <= 0) {
     p.hp = 0; G.state = 'dead'; sfx.dead();
     burst(p.x, p.y, '#4df3ff', 50, 300);
@@ -226,6 +226,16 @@ function burst(x, y, color, n, spd) {
     G.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.6, 0.25), max: 0.6, color, r: rand(3.4, 1.2) });
   }
 }
+
+/**
+ * The difficulty clock, and the ONLY thing allowed to scale enemy numbers with
+ * time. It stops at FINAL_AT because the last fight is a designed encounter whose
+ * escalation is the Devourer's own rage — but until v1.2 only enemy health and
+ * contact damage honoured the freeze. Every ranged attack in the game still read
+ * the raw clock, so stalling the boss did make the chaff unsurvivable on its own,
+ * which is exactly what the freeze was written to prevent.
+ */
+const scaleT = () => Math.min(G.time, FINAL_AT);
 
 /* ------------------------------------------------------------------ spawns */
 /** Enemies arrive just past the corner of the screen, wherever that is. */
@@ -250,7 +260,7 @@ function spawnEnemy(type, at, forceNormal = false) {
   // Time-based scaling stops at FINAL_AT. The last fight is a designed encounter
   // with its own escalation (the Devourer's rage), not one more tick of the curve;
   // without the freeze, stalling it would make the chaff unsurvivable on its own.
-  const t = Math.min(G.time, FINAL_AT);
+  const t = scaleT();
   // Player DPS compounds (damage% x rate% x crit x weapon levels x evolution),
   // so it grows roughly exponentially with pick count. Additive enemy HP could
   // never keep up, which is why strong builds ran away. Match the shape: HP
@@ -395,7 +405,7 @@ export function update(dt) {
         for (let i = 0; i < 8; i++) {
           const ang = base + i * TAU / 8;
           G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(ang) * 200, vy: Math.sin(ang) * 200,
-            r: 6, dmg: 12 * (1 + G.time / 200), life: 4.5, color: '#ff4d5e' });
+            r: 6, dmg: 12 * G.diff.dmg * (1 + scaleT() / 200), life: 4.5, color: '#ff4d5e' });
         }
       }
     }
@@ -409,7 +419,7 @@ export function update(dt) {
         const sh = e.def.shoot, base = angleTo(e, p);
         for (let i = 0; i < sh.count; i++) {
           const ang = sh.count > 1 ? base + i * TAU / sh.count : base;
-          G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(ang) * sh.speed, vy: Math.sin(ang) * sh.speed, r: 6, dmg: sh.dmg * (1 + G.time / 260), life: 5, color: e.color });
+          G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(ang) * sh.speed, vy: Math.sin(ang) * sh.speed, r: 6, dmg: sh.dmg * G.diff.dmg * (1 + scaleT() / 260), life: 5, color: e.color });
         }
       }
     }
@@ -590,7 +600,7 @@ function updateHulks(dt) {
       h.done = true; G.salvaged++;
       burst(h.x, h.y, '#ffc44d', 34, 240);
       G.cam.shake = Math.max(G.cam.shake, 12);
-      const empty = !rollModules().length;
+      const empty = G.player.modules.length >= MODULES.length;
       G.texts.push({ x: h.x, y: h.y - 40, t: 0, v: empty ? 'PICKED CLEAN' : 'SALVAGED',
         color: '#ffc44d', big: true, life: 1.8 });
       if (!empty) queueModal('salvage');
@@ -639,7 +649,7 @@ function updateDevourer(e, dt) {
   const r = Math.min(1, e.rage), over = Math.max(0, e.rage - 1);
   e.phase = k < 0.33 ? 3 : k < 0.66 ? 2 : 1;
   e.speed = e.def.speed * (1 + r * 0.9 + over * 0.85 + (e.phase - 1) * 0.16);
-  e.dmg = e.def.dmg * G.diff.dmg * (1 + G.time / 200) * (1 + over * 1.3);
+  e.dmg = e.def.dmg * G.diff.dmg * (1 + scaleT() / 200) * (1 + over * 1.3);
 
   const arms = 2 + e.phase;
   e.spiral += dt * (1.5 + e.rage * 0.7);

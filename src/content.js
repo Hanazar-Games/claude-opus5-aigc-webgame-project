@@ -194,9 +194,9 @@ export const MODULES = [
 
 /** Enemy scaling multipliers per tier. `spawn` scales the director's rate. */
 export const DIFFICULTIES = [
-  { id: 'recruit', name: 'RECRUIT', desc: 'A shorter climb to the Devourer', hp: 0.66, dmg: 0.78, spawn: 0.88 },
+  { id: 'recruit', name: 'RECRUIT', desc: 'A shorter climb to the Devourer', hp: 0.74, dmg: 0.86, spawn: 0.9 },
   { id: 'veteran', name: 'VETERAN', desc: 'The intended fight', hp: 1, dmg: 1, spawn: 1 },
-  { id: 'nightmare', name: 'NIGHTMARE', desc: 'For a build that already works', hp: 1.42, dmg: 1.24, spawn: 1.16 },
+  { id: 'nightmare', name: 'NIGHTMARE', desc: 'For a build that already works', hp: 1.4, dmg: 1.15, spawn: 1.14 },
 ];
 
 // [startTime, type, weight] — director samples from entries unlocked at time t.

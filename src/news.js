@@ -1,7 +1,20 @@
 /** Version + patch notes. `NEWS[0]` is the current announcement; the rest is history. */
-export const VERSION = 'v1.1';
+export const VERSION = 'v1.2';
 
 export const NEWS = [
+  {
+    v: 'v1.2', title: 'Audit',
+    notes: [
+      'Fixed a <b>hard freeze</b>. Answering a level-up or a salvage draw closed the panel — including a panel the game had just opened for the next queued offer. The result was a modal game state with nothing on screen: the loop will not step, pause is disabled during a modal, and the only way out was a reload. It was reachable exactly when the v1.1 offer queue did its job, which is to say whenever a derelict finished on the same frame as a level-up.',
+      'Fixed: enemy <b>bullet</b> damage never used the difficulty multiplier. Contact damage did, health did, but every Spitter, Mothership and Volley shot in the game fired at the same strength on all three tiers — and the late game is almost entirely bullets. Recruit was not softer where it counted and Nightmare was not harder.',
+      'Fixed: ranged damage also ignored the rule that time-based scaling <em>stops</em> when the Devourer arrives. Health and contact damage froze; bullets kept climbing off the raw clock, so stalling the last fight really did make the chaff unsurvivable on its own — the exact thing the freeze was written to prevent.',
+      'Modules are no longer invisible once taken. They sit next to your weapons in the HUD, the salvage draw shows what you already have installed, and the results screen lists them.',
+      'The music finally answers the tensest seconds in the run: the arrangement holds up while you are stripping a wreck.',
+      'The soundtrack no longer rings on underneath the death sting or the victory fanfare — notes are scheduled ahead of the clock, and stopping only stopped the scheduler.',
+      'A run started straight after dying in the final fight no longer opens on a bar of full-intensity music.',
+      'Balance follows the difficulty fix: Recruit clears about 2 runs in 3, Veteran 1 in 3, Nightmare 1 in 5.',
+    ],
+  },
   {
     v: 'v1.1', title: 'Salvage',
     notes: [

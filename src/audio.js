@@ -240,8 +240,11 @@ function tick() {
 
 function applyMusicGain() {
   const v = (audio.muted || paused) ? 0 : MUSIC_VOL;
-  if (musicGain) musicGain.gain.value = v;
-  if (drumGain) drumGain.gain.value = v;
+  for (const g of [musicGain, drumGain]) {
+    if (!g) continue;
+    if (ctx) g.gain.cancelScheduledValues(ctx.currentTime);   // stopMusic's fade must not win
+    g.gain.value = v;
+  }
 }
 
 /** The last fight opens the filter as well as changing the notes. */
@@ -265,6 +268,7 @@ export function startMusic() {
   stopMusic();
   paused = false;
   music.final = false;
+  music.intensity = 0.2;      // a run that starts right after a death in the final fight
   lowpass.frequency.cancelScheduledValues(c.currentTime);
   lowpass.frequency.value = 2600;
   applyMusicGain();          // respect a mute chosen before music ever started
@@ -274,6 +278,9 @@ export function startMusic() {
 
 export function stopMusic() {
   if (timer) { clearInterval(timer); timer = null; }
+  // Notes are scheduled up to 200ms ahead of the clock. Clearing the timer alone
+  // left the bed ringing underneath the death sting and the victory fanfare.
+  if (ctx) for (const g of [musicGain, drumGain]) g?.gain.setTargetAtTime(0, ctx.currentTime, 0.04);
 }
 
 /** Silence and stop scheduling while the game is paused / the tab is hidden. */
