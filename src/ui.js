@@ -1,7 +1,7 @@
 import { G, applyCard, newRun } from './game.js';
 import { WEAPONS, DIFFICULTIES, ACTS, FINAL_AT } from './content.js';
 import { fmtTime, fmtBig } from './util.js';
-import { sfx, unlockAudio, startMusic, stopMusic, setMusicPaused, setMuted, loadMuted, music } from './audio.js';
+import { sfx, unlockAudio, startMusic, stopMusic, setMusicPaused, setMusicFinal, setMuted, loadMuted, music } from './audio.js';
 import { VERSION, NEWS } from './news.js';
 
 const $ = id => document.getElementById(id);
@@ -57,7 +57,7 @@ export function initUI() {
     const a = btn.dataset.action;
     if (a === 'start') { startRun(); }
     else if (a === 'resume') { G.state = 'playing'; showPanel(null); setMusicPaused(false); }
-    else if (a === 'quit') { G.state = 'title'; showPanel('title'); stopMusic(); buildDiffs(); }
+    else if (a === 'quit') { G.state = 'title'; showPanel('title'); stopMusic(); clearBanners(); buildDiffs(); }
     else if (a === 'news') {
       prevPanel = G.state === 'paused' ? 'pause' : 'title';
       showPanel('news');
@@ -82,9 +82,18 @@ export function initUI() {
 
   // level-up cards are pickable with 1 / 2 / 3
   addEventListener('keydown', ev => {
-    if (G.state !== 'levelup') return;
-    const i = ['Digit1', 'Digit2', 'Digit3'].indexOf(ev.code);
-    if (i >= 0) el.cards.children[i]?.click();
+    if (G.state === 'levelup') {
+      const i = ['Digit1', 'Digit2', 'Digit3'].indexOf(ev.code);
+      if (i >= 0) el.cards.children[i]?.click();
+      return;
+    }
+    // Enter / Space runs the primary action of whatever panel is up, so a run can
+    // be restarted without reaching for the mouse.
+    if (ev.code !== 'Enter' && ev.code !== 'Space') return;
+    const panel = ['title', 'over', 'win', 'pause'].find(k => !el[k].classList.contains('hidden'));
+    if (!panel) return;
+    ev.preventDefault();
+    el[panel].querySelector('.btn.primary')?.click();
   });
 
   G.onLevelUp = showCards;
@@ -94,12 +103,17 @@ export function initUI() {
   showPanel('title');
 }
 
+function clearBanners() { for (const b of el.stage.querySelectorAll('.act-banner')) b.remove(); }
+
 function startRun() {
   newRun(diff);
+  clearBanners();
   el.finalBar.classList.add('hidden');
   el.actTrack.classList.remove('hidden');
+  $('run-diff').textContent = DIFFICULTIES.find(d => d.id === diff).name;
   showPanel(null);
   startMusic();
+  showActBanner(ACTS[0]);          // acts 2-4 announce themselves; act 1 never did
 }
 
 function buildDiffs() {
@@ -120,6 +134,9 @@ function buildDiffs() {
 /** Act turnover: a banner over the field, no pause — the fight does not stop. */
 function showActBanner(act) {
   const final = act.t >= FINAL_AT;
+  if (!final) sfx.act();           // the final act has the Devourer's own arrival cue
+  setMusicFinal(final);
+  clearBanners();
   const d = document.createElement('div');
   d.className = 'act-banner' + (final ? ' final' : '');
   d.innerHTML = `<b>${act.name}</b><i>${act.sub}</i>`;
@@ -129,7 +146,11 @@ function showActBanner(act) {
 }
 
 export function togglePause() {
-  if (G.state === 'playing') { G.state = 'paused'; showPanel('pause'); setMusicPaused(true); }
+  if (G.state === 'playing') {
+    $('pause-info').textContent =
+      `${DIFFICULTIES.find(d => d.id === diff).name} · ${ACTS[G.act].name} · ${fmtTime(G.time)} · Lv.${G.player.level}`;
+    G.state = 'paused'; showPanel('pause'); setMusicPaused(true);
+  }
   else if (G.state === 'paused') { G.state = 'playing'; showPanel(null); setMusicPaused(false); }
 }
 
@@ -196,6 +217,7 @@ function showGameOver() {
 
 function showVictory() {
   stopMusic();
+  sfx.victory();
   const d = DIFFICULTIES.find(x => x.id === diff);
   const first = !clears.includes(diff);
   if (first) { clears.push(diff); save(CLEAR_KEY, clears); }

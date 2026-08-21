@@ -272,15 +272,14 @@ function director(dt) {
 
   while (G.act < ACTS.length - 1 && t >= ACTS[G.act + 1].t) {
     G.act++;
-    G.onAct?.(ACTS[G.act]);
-    G.texts.push({ x: G.player.x, y: G.player.y - 88, t: 0, v: ACTS[G.act].name, color: '#4df3ff', big: true, life: 2.6 });
+    G.onAct?.(ACTS[G.act]);          // the banner is DOM; a canvas copy just doubled it
   }
 
   if (t >= FINAL_AT && !G.final) {
     spawnEnemy('devourer', { x: G.player.x, y: G.player.y - 460 });
     G.final = G.enemies[G.enemies.length - 1];
     G.final.rage = 0; G.final.spiral = 0; G.final.burst = 0; G.final.summon = 6;
-    G.cam.shake = 26; sfx.boss();
+    G.cam.shake = 26; sfx.devourer();
     return;                                   // no chaff wave on the frame it lands
   }
   if (!G.final && t >= G.nextBoss) {

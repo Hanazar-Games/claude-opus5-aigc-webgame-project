@@ -137,6 +137,8 @@ h2.dead{color:var(--red);text-shadow:0 0 20px rgba(255,90,110,.45)}
   background:linear-gradient(90deg,rgba(77,243,255,.35),rgba(255,77,210,.35))}
 .act-track span{position:absolute;inset:0;display:grid;place-items:center;
   font-size:9px;letter-spacing:3px;color:var(--dim)}
+.run-diff{position:absolute;right:8px;top:0;bottom:0;display:grid;place-items:center;
+  font-size:8px;letter-spacing:2px;color:var(--dim);opacity:.75;font-weight:400}
 .final-bar{max-width:640px;margin:10px auto 0;text-align:center}
 .fb-name{font-size:11px;letter-spacing:6px;color:#ff8fa8;text-shadow:0 0 14px rgba(255,47,109,.6)}
 .fb-track{margin-top:5px;height:12px;border-radius:7px;border:1px solid rgba(255,47,109,.55);
@@ -170,3 +172,11 @@ h2.dead{color:var(--red);text-shadow:0 0 20px rgba(255,90,110,.45)}
 h2.won{color:var(--green);text-shadow:0 0 22px rgba(92,255,157,.5)}
 .unlock{margin-top:12px;padding:9px;border-radius:10px;font-size:11px;letter-spacing:1px;
   color:var(--green);border:1px solid rgba(92,255,157,.4);background:rgba(92,255,157,.08)}
+
+/* Respect a system-level request for less motion: the act banner is the only
+   thing in the game that moves purely for effect. */
+@media (prefers-reduced-motion: reduce){
+  .act-banner{animation:actfade 2.8s linear forwards}
+  @keyframes actfade{0%{opacity:0}10%{opacity:1}80%{opacity:1}100%{opacity:0}}
+  .panel{animation:none}
+}
