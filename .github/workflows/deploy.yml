@@ -24,18 +24,29 @@ jobs:
       # A campaign has one number worth gating on: can a competent player clear it,
       # and not every time. Recruit must be winnable, Nightmare must not be a formality.
       - name: Campaign win rate — veteran
-        run: node tools/sim.mjs --runs 24 --diff veteran --assert-win-min 8 --assert-win-max 45
+        run: node tools/sim.mjs --runs 24 --diff veteran --assert-win-min 12 --assert-win-max 62
       - name: Campaign win rate — recruit
-        run: node tools/sim.mjs --runs 16 --diff recruit --assert-win-min 40
+        run: node tools/sim.mjs --runs 16 --diff recruit --assert-win-min 45
       - name: Campaign win rate — nightmare
-        run: node tools/sim.mjs --runs 16 --diff nightmare --assert-win-max 30
+        run: node tools/sim.mjs --runs 16 --diff nightmare --assert-win-max 45
       # Every sim run and screenshot for nine versions was taken at 900x620, and a
       # hard-coded cull radius made the game unplayable above a ~1780px diagonal.
       # Never again: the biggest common desktop window is gated too.
       - name: Playable on a large display
-        run: node tools/sim.mjs --runs 16 --view 1920x1080 --assert-win-min 3
+        run: node tools/sim.mjs --runs 16 --view 1920x1080 --assert-win-min 5
+      # A tab that loads in the background can report innerWidth 0, and resize()
+      # otherwise runs once: the world was then 0x0 and enemies spawned 110px away.
+      - name: Playable at a viewport the page failed to measure
+        run: node tools/sim.mjs --runs 16 --view 1x1 --assert-win-min 10
       - name: Playable on a phone
-        run: node tools/sim.mjs --runs 16 --view 420x780 --assert-win-min 10 --assert-win-max 70
+        run: node tools/sim.mjs --runs 16 --view 420x780 --assert-win-min 20 --assert-win-max 85
+      # Derelicts are optional on Recruit and part of the campaign above it. The
+      # gate holds the Recruit half of that promise; the Veteran run is here for the
+      # invariants, which is a code path --sweep never reaches (it exits before them).
+      - name: Recruit is winnable without touching a derelict
+        run: node tools/sim.mjs --runs 24 --diff recruit --tune hulkFirst=99999 --assert-win-min 8
+      - name: A no-salvage run violates no invariants
+        run: node tools/sim.mjs --runs 16 --tune hulkFirst=99999
       - name: Weapon bench
         run: node tools/bench.mjs --seeds 12
 

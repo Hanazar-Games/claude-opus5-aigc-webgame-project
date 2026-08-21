@@ -170,6 +170,12 @@ h2.dead{color:var(--red);text-shadow:0 0 20px rgba(255,90,110,.45)}
 .diff .clear{color:var(--green)}
 
 h2.won{color:var(--green);text-shadow:0 0 22px rgba(92,255,157,.5)}
+h2.salv{color:var(--amber);text-shadow:0 0 22px rgba(255,196,77,.45)}
+.card.mod{border-color:rgba(255,196,77,.42);background:linear-gradient(90deg,rgba(255,196,77,.09),rgba(255,196,77,.02))}
+.card.mod:hover{border-color:var(--amber);background:rgba(255,196,77,.16)}
+.card.mod h3{color:var(--amber)}
+.salv-hud{position:absolute;left:0;right:0;bottom:74px;text-align:center;pointer-events:none;
+  font-size:10px;letter-spacing:4px;color:var(--amber);text-shadow:0 0 12px rgba(255,196,77,.5)}
 .unlock{margin-top:12px;padding:9px;border-radius:10px;font-size:11px;letter-spacing:1px;
   color:var(--green);border:1px solid rgba(92,255,157,.4);background:rgba(92,255,157,.08)}
 

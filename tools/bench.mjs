@@ -40,6 +40,7 @@ const FIELD = 60, WARM = 60, FIELD_SECS = 90, FIELD_SEEDS = +arg('seeds', 12);
 
 function loadout(id, lv, stat) {
   const p = G.player;
+  G.nextHulk = Infinity;      // a weapon bench measures the weapon, not a module roll
   p.crit = 0;                                     // the only damage RNG; off by default
   p.weapons = [{ id, lv, t: 0, angle: 0 }];
   if (stat) STAT_UPGRADES.find(s => s.id === stat).apply(p);

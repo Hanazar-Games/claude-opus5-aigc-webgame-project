@@ -5,6 +5,7 @@
  *   node tools/sim.mjs                       # default: 24 runs, kite bot, greedy picks
  *   node tools/sim.mjs --runs 60 --bot circle --picks random
  *   node tools/sim.mjs --diff nightmare      # recruit | veteran | nightmare
+ *   node tools/sim.mjs --tune hulkFirst=99999   # what a run that skips every derelict looks like
  *   node tools/sim.mjs --view 420x780        # phone-shaped viewport
  *
  * Since v1.0 a run is a campaign that can be won, so the headline number is the
@@ -16,7 +17,7 @@
  * util.setSeed(), so a given seed replays exactly. Use this to check whether a
  * balance change actually moved the numbers instead of eyeballing the canvas.
  */
-import { G, TUNE, update, newRun, rollCards, applyCard } from '../src/game.js';
+import { G, TUNE, update, newRun, applyCard, applyModule } from '../src/game.js';
 import { ACTS, FINAL_AT } from '../src/content.js';
 import { input } from '../src/input.js';
 import { setSeed } from '../src/util.js';
@@ -32,6 +33,13 @@ const RUNS = +arg('runs', 24);
 const BOT = arg('bot', 'kite');
 const PICKS = arg('picks', 'greedy');
 const DIFF = arg('diff', 'veteran');
+// --tune key=value, repeatable. Unlike --sweep this keeps the normal report and,
+// crucially, the invariant checks and the win-rate gate: --sweep exits before them.
+for (const kv of argv.filter((_, i) => argv[i - 1] === '--tune')) {
+  const [k, v] = kv.split('=');
+  if (!(k in TUNE)) { console.error(`FAIL: --tune ${k} is not a TUNE knob`); process.exit(1); }
+  TUNE[k] = +v;
+}
 const CAP = +arg('cap', 900);              // hard stop; a run that hits this is a bug
 const [VW, VH] = arg('view', '900x620').split('x').map(Number);
 const STEP = 1 / 60;
@@ -63,7 +71,11 @@ function runOne(seed) {
   let peak = 0, visSum = 0, visN = 0;
 
   for (let i = 0; i < maxSteps; i++) {
-    if (G.state === 'levelup') applyCard(pickCard(rollCards()));
+    if (G.state === 'levelup') applyCard(pickCard(G.offer));
+    // Salvage draws are taken in offer order: the modules are deliberately not
+    // comparable on one axis, so ranking them would encode my opinion, not a
+    // player's, and the win rate would measure my opinion.
+    if (G.state === 'salvage') applyModule(G.offer[0]);
     if (G.state !== 'playing') break;
     const p = G.player, t = i / 60;
     const m = move(p, t);
@@ -82,9 +94,12 @@ function runOne(seed) {
   input.x = input.y = 0;
   return {
     time: G.time, kills: G.kills, level: G.player.level, won: G.state === 'won',
+    salvaged: G.salvaged, hulksLost: G.hulksLost, modules: G.player.modules.slice(),
     act: G.act, finalHp: G.final ? Math.max(0, G.final.hp / G.final.maxHp) : 1,
     bossSpawned: G.bossSpawns, bossKilled: G.bossKills,
     weapons: G.player.weapons.map(w => `${w.id}${w.lv}`).join(' '),
+    nan: ['x', 'y', 'hp', 'maxHp', 'damage', 'rate', 'speed', 'area', 'crit', 'range', 'pickup']
+      .filter(k => !Number.isFinite(G.player[k])),
     visible: visSum / Math.max(1, visN), peak,
   };
 }
@@ -136,9 +151,16 @@ console.log(`  died in    ` + ACTS.map((a, i) =>
 console.log(`  survival   p25 ${f1(q(times, .25))}s   median ${f1(q(times, .5))}s   p75 ${f1(q(times, .75))}s`);
 console.log(`  level      p25 ${q(levels, .25)}      median ${q(levels, .5)}      p75 ${q(levels, .75)}`);
 console.log(`  kills      median ${q(results.map(r => r.kills), .5)}`);
+console.log(`  salvage    ${f1(results.reduce((a, r) => a + r.salvaged, 0) / RUNS)} stripped per run, ` +
+  `${f1(results.reduce((a, r) => a + r.hulksLost, 0) / RUNS)} drifted away`);
 console.log(`  boss       spawned ${results.reduce((a, r) => a + r.bossSpawned, 0)}  killed ${results.reduce((a, r) => a + r.bossKilled, 0)}`);
 console.log(`  on-screen  ${f1(results.reduce((a, r) => a + r.visible, 0) / RUNS)} enemies avg`);
 console.log(`  perf       peak update ${f1(Math.max(...results.map(r => r.peak)))}ms\n`);
+
+const mc = {};
+for (const r of results) for (const m of r.modules) mc[m] = (mc[m] || 0) + 1;
+if (Object.keys(mc).length)
+  console.log('  modules taken: ' + Object.entries(mc).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join('  ') + '\n');
 
 // weapon popularity, to spot picks that never get taken
 const wc = {};
@@ -158,6 +180,9 @@ for (const [i, r] of results.entries()) {
   if (r.time < 0 || !Number.isFinite(r.time)) bad.push(`seed ${seed}: bogus run time ${r.time}`);
   if (r.level < 1) bad.push(`seed ${seed}: level ${r.level} below start`);
   if (r.kills < 0) bad.push(`seed ${seed}: negative kills ${r.kills}`);
+  if (r.nan.length) bad.push(`seed ${seed}: player.${r.nan.join('/')} is not a finite number`);
+  if (new Set(r.modules).size !== r.modules.length) bad.push(`seed ${seed}: took a salvage module twice (${r.modules})`);
+  if (r.modules.length > r.salvaged) bad.push(`seed ${seed}: ${r.modules.length} modules from ${r.salvaged} derelicts`);
   if (r.won && r.time < FINAL_AT) bad.push(`seed ${seed}: won at ${f1(r.time)}s, before the Devourer spawns`);
   if (r.time >= CAP - 0.5) bad.push(`seed ${seed}: run never ended (${CAP}s hard stop) — the arc is not terminating`);
 }

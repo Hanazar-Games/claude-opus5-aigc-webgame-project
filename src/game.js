@@ -1,5 +1,5 @@
 import { TAU, clamp, rand, random, pick, angleTo, weightedPick } from './util.js';
-import { WEAPONS, ENEMIES, SPAWN_TABLE, BOSS_INTERVAL, STAT_UPGRADES, HEAL_CARD, FINAL_AT, ACTS, DIFFICULTIES } from './content.js';
+import { WEAPONS, ENEMIES, SPAWN_TABLE, BOSS_INTERVAL, STAT_UPGRADES, HEAL_CARD, FINAL_AT, ACTS, DIFFICULTIES, DERELICT, MODULES } from './content.js';
 import { sfx } from './audio.js';
 import { readMove } from './input.js';
 
@@ -7,19 +7,22 @@ const ENEMY_CAP = 380;
 const CELL = 64;
 
 /** Knobs the balance sim can sweep (see `node tools/sim.mjs --sweep`). */
-export const TUNE = { hpDouble: 110, orbLag: 1.0, spawnRamp: 24, xpCurve: 0.16, finalHp: 175000, orbHome: 7, rageRamp: 95 };
+export const TUNE = { hpDouble: 84, orbLag: 1.0, spawnRamp: 24, xpCurve: 0.16, finalHp: 330000, orbHome: 7, rageRamp: 95, salvageHeat: 1.5, salvageChoke: 1.85,
+  hulkFirst: 46, hulkEvery: 88 };
 
 export const G = {
   state: 'title',
   time: 0, kills: 0, dmgDealt: 0, bossCount: 0, bossSpawns: 0, bossKills: 0,
   diff: DIFFICULTIES[1], act: 0, final: null,
+  nextHulk: 0, salvaged: 0, hulksLost: 0,
   player: null,
-  enemies: [], bullets: [], ebullets: [], orbs: [], pickups: [], parts: [], texts: [], novas: [],
+  enemies: [], bullets: [], ebullets: [], orbs: [], pickups: [], parts: [], texts: [], novas: [], hulks: [],
   cam: { x: 0, y: 0, shake: 0 },
   view: { w: 800, h: 600 },
   spawnAcc: 0, nextBoss: BOSS_INTERVAL,
   grid: new Map(),
-  onLevelUp: null, onDeath: null, onWin: null, onAct: null,
+  modal: [], offer: null,
+  onLevelUp: null, onDeath: null, onWin: null, onAct: null, onSalvage: null,
 };
 
 /* ------------------------------------------------------------------- setup */
@@ -28,11 +31,15 @@ export function newRun(diffId = 'veteran') {
   G.act = 0; G.final = null;
   G.time = 0; G.kills = 0; G.dmgDealt = 0; G.bossCount = 0; G.bossSpawns = 0; G.bossKills = 0; G.spawnAcc = 0; G.nextBoss = BOSS_INTERVAL;
   G.enemies.length = G.bullets.length = G.ebullets.length = 0;
-  G.orbs.length = G.pickups.length = G.parts.length = G.texts.length = G.novas.length = 0;
+  G.orbs.length = G.pickups.length = G.parts.length = G.texts.length = G.novas.length = G.hulks.length = 0;
+  G.nextHulk = TUNE.hulkFirst; G.salvaged = 0; G.hulksLost = 0;
+  G.modal.length = 0; G.offer = null;
   G.cam.x = G.cam.y = 0; G.cam.shake = 0;
   G.player = {
     x: 0, y: 0, r: 13, hp: 120, maxHp: 120, speed: 178,
     damage: 1, rate: 1, armor: 1, pickup: 125, crit: 0.05, area: 1, xpMult: 1, regen: 0,
+    slots: 4, range: 1, pointDef: 0, pointDefT: 0, lifesteal: 0, reactive: 0,
+    modules: [],
     level: 1, xp: 0, xpNext: 5, invuln: 0, dir: -Math.PI / 2, moving: 0, picks: {},
     weapons: [{ id: 'blaster', lv: 1, t: 0, angle: 0 }],
   };
@@ -68,7 +75,7 @@ const _q = [];
  * boss can never be killed.
  */
 G.nearestEnemy = (from, maxD = 900, idx = 0, prefer = false) => {
-  const md2 = maxD * maxD;
+  const md2 = (maxD * G.player.range) ** 2;
   if (prefer) {
     let bb = null, bbd = Infinity;
     for (const e of G.enemies) {
@@ -146,6 +153,7 @@ function damageEnemy(e, dmg, canCrit = true) {
 function killEnemy(e) {
   e.dead = true;
   G.kills++;
+  if (G.player.lifesteal) G.player.hp = Math.min(G.player.maxHp, G.player.hp + G.player.lifesteal);
   burst(e.x, e.y, e.color, e.boss ? 40 : e.elite ? 20 : 8, e.boss ? 260 : 150);
   const n = e.boss ? 14 : e.elite ? 5 : 1;
   for (let i = 0; i < n; i++)
@@ -204,6 +212,7 @@ function hurtPlayer(dmg) {
   p.invuln = 0.7;
   G.cam.shake = Math.max(G.cam.shake, 9);
   sfx.hurt();
+  if (p.reactive) G.novaBlast(p.x, p.y, 150 + p.reactive * 40, 45 + G.time * 0.9, 300);
   if (p.hp <= 0) {
     p.hp = 0; G.state = 'dead'; sfx.dead();
     burst(p.x, p.y, '#4df3ff', 50, 300);
@@ -221,10 +230,18 @@ function burst(x, y, color, n, spd) {
 /* ------------------------------------------------------------------ spawns */
 /** Enemies arrive just past the corner of the screen, wherever that is. */
 const REF_RING = Math.hypot(900, 620) * 0.5 + 110;
-const spawnRing = () => Math.hypot(G.view.w, G.view.h) * 0.5 + 110;
+// Floored, so a viewport the page failed to measure degrades into a small screen
+// instead of a ring that spawns enemies inside the player's own reaction time.
+const spawnRing = () => Math.max(420, Math.hypot(G.view.w, G.view.h) * 0.5 + 110);
 
 function spawnPoint() {
-  const a = rand(TAU), d = spawnRing();
+  const a = rand(TAU);
+  // A live beacon calls reinforcements in close and drops them around the wreck,
+  // not around you. That is the whole price of standing still: they arrive sooner
+  // and they arrive already between you and the way out.
+  const h = G.hulks.find(x => x.active);
+  if (h) return { x: h.x + Math.cos(a) * spawnRing() * 0.6, y: h.y + Math.sin(a) * spawnRing() * 0.6 };
+  const d = spawnRing();
   return { x: G.player.x + Math.cos(a) * d, y: G.player.y + Math.sin(a) * d };
 }
 
@@ -241,7 +258,10 @@ function spawnEnemy(type, at, forceNormal = false) {
   // The Devourer's health is set outright rather than read off the time curve:
   // it is the length of one designed fight, and it should not move every time the
   // chaff curve is retuned.
-  const hpMult = def.final ? G.diff.hp
+  // The Devourer takes only part of the tier's health multiplier. A harder tier
+  // already means you arrive at it with a weaker build and less time on the clock;
+  // charging the full multiplier on top made Nightmare 0 for 12 at the wall.
+  const hpMult = def.final ? 1 + (G.diff.hp - 1) * 0.7
     : (Math.pow(2, t / TUNE.hpDouble) + (def.boss ? (G.bossCount - 1) * 0.75 : 0)) * G.diff.hp;
   const dmgMult = (1 + t / 200) * G.diff.dmg;
   const p = at || spawnPoint();
@@ -301,7 +321,8 @@ function director(dt) {
   // different game per window: 77 enemies alive on a 900x620 desktop against 47 on
   // a 420x780 phone, and a 31% win rate against 59%. Cancel the screen out.
   const rate = (0.45 + Math.min(t, FINAL_AT) / TUNE.spawnRamp)
-    * (G.final ? 0.22 : bossFight ? 0.5 : 1) * G.diff.spawn * (REF_RING / spawnRing());
+    * (G.final ? 0.22 : bossFight ? 0.5 : 1) * G.diff.spawn * (REF_RING / spawnRing())
+    * (salvaging() ? TUNE.salvageHeat : 1);
   G.spawnAcc += dt * rate;
   const table = SPAWN_TABLE.filter(r => t >= r[0]).map(r => ({ type: r[1], weight: r[2] }));
   while (G.spawnAcc >= 1) {
@@ -322,6 +343,7 @@ export function update(dt) {
   G.time += dt;
   buildGrid();
   director(dt);
+  updateHulks(dt);
 
   /* player movement */
   const mv = readMove();
@@ -333,15 +355,23 @@ export function update(dt) {
   p.invuln = Math.max(0, p.invuln - dt);
   if (p.regen) p.hp = Math.min(p.maxHp, p.hp + p.regen * dt);
 
-  /* weapons */
+  /**
+   * Weapons. `choke` is the real price of a derelict: stripping one diverts the
+   * reactor, so you fire slower for exactly the seconds the field is closing on
+   * you. It had to be this rather than "more enemies" — the first version of the
+   * beacon spawned reinforcements and the win rate went UP, because in a game
+   * where a built player out-clears the spawn rate, extra enemies are extra XP.
+   * A cost the player can convert into progress is not a cost.
+   */
+  const choke = G.hulks.some(h => h.active) ? TUNE.salvageChoke : 1;
   for (const w of p.weapons) {
     const def = WEAPONS[w.id], s = def.stats(w.lv);
-    if (def.orbital) { w.angle = (w.angle + s.spin * dt) % TAU; continue; }
+    if (def.orbital) { w.angle = (w.angle + s.spin * dt / choke) % TAU; continue; }
     w.t += dt;
-    const cd = Math.max(0.06, s.cd * p.rate);
+    const cd = Math.max(0.06, s.cd * p.rate * choke);
     if (w.t >= cd) { w.t = 0; def.fire(G, s); if (w.id !== 'nova') sfx.shoot(); }
   }
-  updateOrbitals(dt);
+  updateOrbitals(dt, choke);
 
   /* enemies */
   const cull = (spawnRing() + 380) ** 2;
@@ -430,6 +460,20 @@ export function update(dt) {
     if (b.life <= 0 && b.blast) burst(b.x, b.y, b.color, 6, 120);
   }
 
+  /* point defense — the late game is bullets, and this is the only answer to them */
+  if (p.pointDef) {
+    p.pointDefT -= dt;
+    if (p.pointDefT <= 0) {
+      p.pointDefT = 1.7;
+      const r2 = p.pointDef * p.pointDef;
+      let burned = 0;
+      for (const b of G.ebullets)
+        if ((b.x - p.x) ** 2 + (b.y - p.y) ** 2 < r2) { b.life = 0; burned++; }
+      G.novas.push({ x: p.x, y: p.y, r: p.pointDef, t: 0, dur: 0.3, calm: true });
+      if (burned) sfx.pdef();
+    }
+  }
+
   /* enemy bullets */
   for (const b of G.ebullets) {
     b.life -= dt; b.x += b.vx * dt; b.y += b.vy * dt;
@@ -483,7 +527,7 @@ export function update(dt) {
  * So the ring trails behind you while you move, sweeping the wake you are
  * dragging the crowd through instead of the empty space ahead of you.
  */
-function updateOrbitals(dt) {
+function updateOrbitals(dt, choke = 1) {
   const p = G.player;
   for (const w of p.weapons) {
     const def = WEAPONS[w.id]; if (!def.orbital) continue;
@@ -498,10 +542,82 @@ function updateOrbitals(dt) {
         const rr = e.r + s.r;
         if ((e.x - bx) ** 2 + (e.y - by) ** 2 > rr * rr) continue;
         damageEnemy(e, s.dmg * p.damage);
-        e.orbCd = s.hitCd * p.rate;
+        e.orbCd = s.hitCd * p.rate * choke;
       }
     }
   }
+}
+
+/* --------------------------------------------------------------- derelicts */
+function spawnHulk() {
+  const a = rand(TAU), d = spawnRing() * 0.8;
+  G.hulks.push({
+    x: G.player.x + Math.cos(a) * d, y: G.player.y + Math.sin(a) * d,
+    vx: rand(14, -14), vy: rand(14, -14),
+    r: 30, t: 0, p: 0, active: false, spin: rand(TAU),
+  });
+  G.texts.push({ x: G.player.x, y: G.player.y - 60, t: 0, v: 'DERELICT DETECTED', color: '#ffc44d', life: 1.8 });
+  sfx.hulk();
+}
+
+/**
+ * A hulk is only worth anything if you stand in it, and standing still is the one
+ * thing this game has always punished. So the price is explicit: while you are
+ * stripping one, its beacon drags the whole field onto your position and the
+ * director spawns harder. Step out and progress bleeds back, but slower than it
+ * built — a dodge should cost you, not erase you.
+ */
+function updateHulks(dt) {
+  const p = G.player;
+  if (!G.final && G.time >= G.nextHulk) { G.nextHulk = G.time + TUNE.hulkEvery; spawnHulk(); }
+
+  for (const h of G.hulks) {
+    h.t += dt;
+    h.x += h.vx * dt; h.y += h.vy * dt;
+    h.spin += dt * 0.35;
+    const inside = Math.hypot(p.x - h.x, p.y - h.y) < DERELICT.radius;
+    h.active = inside;
+    h.p = clamp(h.p + (inside ? dt / DERELICT.secs : -dt * DERELICT.decay / DERELICT.secs), 0, 1);
+
+    if (inside) {
+      for (const e of G.enemies) {
+        if (e.boss) continue;
+        const dx = h.x - e.x, dy = h.y - e.y, d = Math.hypot(dx, dy) || 1;
+        e.x += dx / d * DERELICT.pull * dt; e.y += dy / d * DERELICT.pull * dt;
+      }
+    }
+    if (h.p >= 1) {
+      h.done = true; G.salvaged++;
+      burst(h.x, h.y, '#ffc44d', 34, 240);
+      G.cam.shake = Math.max(G.cam.shake, 12);
+      const empty = !rollModules().length;
+      G.texts.push({ x: h.x, y: h.y - 40, t: 0, v: empty ? 'PICKED CLEAN' : 'SALVAGED',
+        color: '#ffc44d', big: true, life: 1.8 });
+      if (!empty) queueModal('salvage');
+    } else if (h.t > DERELICT.life) {
+      h.done = true; G.hulksLost++;
+      G.texts.push({ x: h.x, y: h.y, t: 0, v: 'LOST', color: '#8a97b8', life: 1.2 });
+    }
+  }
+  if (G.hulks.some(h => h.done)) G.hulks = G.hulks.filter(h => !h.done);
+}
+
+/** True while the player is actually stripping a hulk — the director reads this. */
+const salvaging = () => G.hulks.some(h => h.active);
+
+export function rollModules() {
+  const have = new Set(G.player.modules);
+  const pool = MODULES.filter(m => !have.has(m.id));
+  const out = [];
+  while (out.length < DERELICT.draw && pool.length) out.push(...pool.splice((random() * pool.length) | 0, 1));
+  return out;
+}
+
+export function applyModule(m) {
+  m.apply(G.player);
+  G.player.modules.push(m.id);
+  G.state = 'playing';
+  flushModal();
 }
 
 /**
@@ -514,20 +630,27 @@ function updateOrbitals(dt) {
 function updateDevourer(e, dt) {
   const p = G.player;
   const k = e.hp / e.maxHp;
-  e.rage = Math.min(1, (G.time - FINAL_AT) / TUNE.rageRamp);
+  // Rage does NOT cap. It used to stop at 1.0, and a build that could survive the
+  // Devourer without out-damaging it simply stalled: the sim's "no run may reach
+  // the hard stop" invariant caught runs still going at 900s. Past the first ramp
+  // it goes into overdrive, which is what actually guarantees the arc terminates.
+  // The first `rageRamp` seconds are unchanged, so the tuned fight is untouched.
+  e.rage = (G.time - FINAL_AT) / TUNE.rageRamp;
+  const r = Math.min(1, e.rage), over = Math.max(0, e.rage - 1);
   e.phase = k < 0.33 ? 3 : k < 0.66 ? 2 : 1;
-  e.speed = e.def.speed * (1 + e.rage * 0.9 + (e.phase - 1) * 0.16);
+  e.speed = e.def.speed * (1 + r * 0.9 + over * 0.85 + (e.phase - 1) * 0.16);
+  e.dmg = e.def.dmg * G.diff.dmg * (1 + G.time / 200) * (1 + over * 1.3);
 
   const arms = 2 + e.phase;
   e.spiral += dt * (1.5 + e.rage * 0.7);
   e.burst -= dt;
   if (e.burst <= 0) {
-    e.burst = Math.max(0.14, 0.3 - e.rage * 0.1 - (e.phase - 1) * 0.03);
+    e.burst = Math.max(0.11, 0.3 - r * 0.1 - over * 0.05 - (e.phase - 1) * 0.03);
     for (let i = 0; i < arms; i++) {
       const a = e.spiral + i * TAU / arms;
       G.ebullets.push({ x: e.x + Math.cos(a) * e.r, y: e.y + Math.sin(a) * e.r,
         vx: Math.cos(a) * 190, vy: Math.sin(a) * 190, r: 7,
-        dmg: 15 * G.diff.dmg * (1 + e.rage * 0.8), life: 6, color: '#ff2f6d' });
+        dmg: 15 * G.diff.dmg * (1 + r * 0.8 + over * 1.1), life: 6, color: '#ff2f6d' });
     }
   }
 
@@ -542,7 +665,7 @@ function updateDevourer(e, dt) {
   }
 
   // A slow inward pull, so backing off forever is not free either.
-  const a = angleTo(p, e), pull = 26 * e.rage * dt;
+  const a = angleTo(p, e), pull = 26 * Math.min(e.rage, 5) * dt;
   p.x += Math.cos(a) * pull; p.y += Math.sin(a) * pull;
 }
 
@@ -576,6 +699,35 @@ function prune() {
   G.texts = G.texts.filter(t => t.t < (t.life || 0.9));
 }
 
+/* ------------------------------------------------------------------ modals */
+/**
+ * Level-ups and salvage draws are both modal, and both can be raised inside the
+ * same `update()`. Raising one directly used to overwrite whichever was already
+ * on screen and the unanswered offer was gone for good — collect the last orb of
+ * a boss drop as a hulk finishes and the module choice simply never happened.
+ * They queue instead, and the contents are rolled at the moment one is shown so
+ * a pick made in the first offer is reflected in the second.
+ */
+function queueModal(kind) {
+  G.modal.push(kind);
+  flushModal();
+}
+
+function flushModal() {
+  if (G.state !== 'playing' || !G.modal.length) return;
+  const kind = G.modal.shift();
+  // The offer is published on G so a headless driver answers the SAME three cards
+  // the player would see. Calling rollCards() again to decide consumes more of the
+  // seeded stream and silently forks the run: the sim was not testing the offers
+  // the game actually makes, and a browser replay of a given seed could not match.
+  const offer = kind === 'levelup' ? rollCards() : rollModules();
+  if (!offer.length) return flushModal();        // module pool exhausted
+  G.offer = offer;
+  G.state = kind;
+  if (kind === 'levelup') { sfx.levelup(); G.onLevelUp?.(offer); }
+  else { sfx.salvage(); G.onSalvage?.(offer); }
+}
+
 /* ---------------------------------------------------------------- progress */
 function gainXp(n) {
   const p = G.player;
@@ -590,9 +742,7 @@ function gainXp(n) {
     // between — a tenth of a point on the xp curve swung the win rate 0% to 58%.
     p.xpNext = Math.floor(7 * Math.pow(1 + TUNE.xpCurve, p.level));
     p.hp = Math.min(p.maxHp, p.hp + 4);
-    G.state = 'levelup';
-    sfx.levelup();
-    G.onLevelUp?.(rollCards());
+    queueModal('levelup');
   }
 }
 
@@ -622,7 +772,7 @@ export function rollCards() {
     if (w.lv < WEAPONS[id].max)
       pool.push({ kind: 'up', id, icon: WEAPONS[id].icon, name: `${WEAPONS[id].name} Lv.${w.lv + 1}`, desc: WEAPONS[id].desc(w.lv + 1), weight: 5 });
   }
-  if (owned.size < 4)
+  if (owned.size < p.slots)
     for (const id of Object.keys(WEAPONS)) {
       const def = WEAPONS[id];
       // Never re-offer a base weapon once its evolution is owned: taking it would
@@ -673,4 +823,5 @@ export function applyCard(card) {
     p.picks[card.id] = (p.picks[card.id] || 0) + 1;
   }
   G.state = 'playing';
+  flushModal();
 }

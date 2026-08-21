@@ -110,11 +110,46 @@ export const sfx = {
     [1046.5, 1318.5, 1568].forEach((f, i) => tone({ freq: f, dur: 1.5, type: 'sine', vol: 0.13, delay: 0.55 + i * 0.02 }));
   },
   act: () => [0, 0.11].forEach((d, i) => tone({ freq: 330 * (i + 1), to: 494 * (i + 1), dur: 0.42, type: 'sine', vol: 0.15 - i * 0.05, delay: d })),
+  // derelicts: a sonar ping to find one, a hull-plate clang to finish one
+  hulk: () => [0, 0.26].forEach(d => tone({ freq: 1180, to: 1180, dur: 0.3, type: 'sine', vol: 0.11, delay: d })),
+  salvage: () => {
+    [392, 523.25, 659.25, 880].forEach((f, i) => tone({ freq: f, dur: 0.34, type: 'triangle', vol: 0.19, delay: i * 0.075 }));
+    noise({ dur: 0.2, vol: 0.14, freq: 2400 });
+  },
+  pdef: () => gate('pdef', 0.2, () => { tone({ freq: 2200, to: 640, dur: 0.09, type: 'square', vol: 0.09 }); noise({ dur: 0.06, vol: 0.07, freq: 3600 }); }),
   select: () => tone({ freq: 620, to: 900, dur: 0.09, type: 'sine', vol: 0.18 }),
   heal: () => [523, 784].forEach((f, i) => tone({ freq: f, dur: 0.18, type: 'sine', vol: 0.2, delay: i * 0.07 })),
   magnet: () => tone({ freq: 300, to: 1200, dur: 0.26, type: 'triangle', vol: 0.18 }),
   strike: () => { tone({ freq: 160, to: 50, dur: 0.42, type: 'sawtooth', vol: 0.28 }); noise({ dur: 0.4, vol: 0.22, freq: 700 }); },
 };
+
+/**
+ * Salvage hum — the only sustained voice in the game. One oscillator for the whole
+ * session, held silent between uses: creating and tearing down a running node on
+ * every entry and exit of a radius the player is dodging in and out of is how you
+ * get clicks. Pitch and filter track progress, so the sound tells you how close
+ * you are without looking at the ring.
+ */
+let humOsc = null, humGain = null, humFilt = null;
+export function salvageHum(on, k = 0) {
+  const c = ensure();
+  if (!c) return;
+  if (on && !audio.muted) {
+    if (!humOsc) {
+      humOsc = c.createOscillator(); humOsc.type = 'sawtooth';
+      humFilt = c.createBiquadFilter(); humFilt.type = 'lowpass';
+      humGain = c.createGain(); humGain.gain.value = 0;
+      humOsc.connect(humFilt); humFilt.connect(humGain); humGain.connect(master);
+      humOsc.start();
+    }
+    const t = c.currentTime;
+    humOsc.frequency.setTargetAtTime(88 + k * 140, t, 0.08);
+    humFilt.frequency.setTargetAtTime(460 + k * 2000, t, 0.1);
+    humGain.gain.setTargetAtTime(0.1, t, 0.05);
+  } else if (humGain) {
+    humGain.gain.setTargetAtTime(0, c.currentTime, 0.06);
+  }
+}
 
 /* ------------------------------------------------------------------- music */
 // Generative bed, no audio files: a 4-bar minor progression whose layers switch

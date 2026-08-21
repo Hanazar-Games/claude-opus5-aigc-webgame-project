@@ -10,7 +10,12 @@ let dpr = 1, W = 0, H = 0;
 
 function resize() {
   dpr = Math.min(devicePixelRatio || 1, 2);
-  W = innerWidth; H = innerHeight;
+  // A tab that loads in the background can report innerWidth 0 until it is first
+  // shown, and resize() otherwise runs once. The world is sized from this, and a
+  // 0x0 world puts the enemy spawn ring at 110px — right on top of the player,
+  // with no reaction time at all. Fall back, and re-measure when the tab appears.
+  W = innerWidth || document.documentElement.clientWidth || 900;
+  H = innerHeight || document.documentElement.clientHeight || 620;
   canvas.width = Math.floor(W * dpr);
   canvas.height = Math.floor(H * dpr);
   G.view.w = W; G.view.h = H;
@@ -25,7 +30,7 @@ addEventListener('pointerdown', unlockAudio, { once: true });
 addEventListener('keydown', unlockAudio, { once: true });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { if (G.state === 'playing') togglePause(); setMusicPaused(true); }
-  else if (G.state === 'playing') setMusicPaused(false);
+  else { resize(); if (G.state === 'playing') setMusicPaused(false); }
 });
 
 const STEP = 1 / 60;

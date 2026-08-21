@@ -149,11 +149,54 @@ export const ACTS = [
   { t: FINAL_AT, name: 'THE DEVOURER', sub: 'It has been waiting the whole run' },
 ];
 
+/**
+ * Derelicts. The game is called Scavenger and until v1.1 there was nothing in it
+ * to scavenge — but the reason to build this is mechanical, not thematic. Every
+ * measurement in this project says the dominant strategy is to run away forever:
+ * the kiting bot beats the charging one, and an entire weapon line was five times
+ * weaker for kiters because enemies never entered its radius. The root cause is
+ * that the game never gave a reason to hold ground. A derelict is that reason —
+ * stand in it long enough to strip it, while its beacon drags the field onto you.
+ */
+export const DERELICT = {
+  // cadence lives in TUNE.hulkFirst / TUNE.hulkEvery so the sim can sweep it
+  radius: 108,      // you must be inside this to make progress
+  secs: 7.5,        // seconds of holding to strip one clean
+  decay: 0.45,      // progress bleeds at this fraction of charge rate when you step out
+  life: 50,         // it drifts away if ignored this long
+  pull: 74,         // px/s the beacon drags every enemy toward the hulk
+  draw: 3,          // modules offered on completion
+};
+
+/**
+ * Salvage modules. These never appear in a level-up: they are what the risk buys,
+ * and each one changes a rule rather than scaling a number, so a run that salvages
+ * plays differently instead of just harder.
+ */
+export const MODULES = [
+  { id: 'slot', icon: '🔩', name: 'Reactor Coupling', desc: 'A fifth weapon hardpoint',
+    apply: p => p.slots++ },
+  { id: 'pdef', icon: '🛰', name: 'Point Defense', desc: 'Periodically burns every enemy shot near you',
+    apply: p => p.pointDef += 130 },
+  { id: 'vamp', icon: '🩸', name: 'Vampiric Coils', desc: 'Each kill restores 0.45 HP',
+    apply: p => p.lifesteal += 0.45 },
+  { id: 'clock', icon: '⚙', name: 'Overclock', desc: '+35% damage · −22% max HP',
+    apply: p => { p.damage += 0.35; p.maxHp = Math.round(p.maxHp * 0.78); p.hp = Math.min(p.hp, p.maxHp); } },
+  { id: 'drone', icon: '🧲', name: 'Salvage Drone', desc: '+260 pickup range',
+    apply: p => p.pickup += 260 },
+  { id: 'react', icon: '💢', name: 'Reactive Plating', desc: 'Taking a hit detonates a shockwave',
+    apply: p => p.reactive += 1 },
+  { id: 'hull', icon: '🧱', name: 'Ablative Hull', desc: '+90 max HP and heal · −9% speed',
+    apply: p => { p.maxHp += 90; p.hp += 90; p.speed *= 0.91; } },
+  { id: 'uplink', icon: '📡', name: 'Targeting Uplink', desc: '+30% weapon range',
+    apply: p => p.range += 0.3 },
+];
+
 /** Enemy scaling multipliers per tier. `spawn` scales the director's rate. */
 export const DIFFICULTIES = [
-  { id: 'recruit', name: 'RECRUIT', desc: 'A shorter climb to the Devourer', hp: 0.62, dmg: 0.76, spawn: 0.86 },
+  { id: 'recruit', name: 'RECRUIT', desc: 'A shorter climb to the Devourer', hp: 0.66, dmg: 0.78, spawn: 0.88 },
   { id: 'veteran', name: 'VETERAN', desc: 'The intended fight', hp: 1, dmg: 1, spawn: 1 },
-  { id: 'nightmare', name: 'NIGHTMARE', desc: 'For a build that already works', hp: 1.45, dmg: 1.22, spawn: 1.15 },
+  { id: 'nightmare', name: 'NIGHTMARE', desc: 'For a build that already works', hp: 1.42, dmg: 1.24, spawn: 1.16 },
 ];
 
 // [startTime, type, weight] — director samples from entries unlocked at time t.

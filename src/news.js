@@ -1,7 +1,21 @@
 /** Version + patch notes. `NEWS[0]` is the current announcement; the rest is history. */
-export const VERSION = 'v1.0';
+export const VERSION = 'v1.1';
 
 export const NEWS = [
+  {
+    v: 'v1.1', title: 'Salvage',
+    notes: [
+      'The game is called <b>Scavenger</b> and until now there was nothing in it to scavenge. <b>Derelicts</b> drift into the field: stand inside one long enough and you strip it for a <b>module</b> — a fifth weapon hardpoint, point defense that burns incoming fire, coils that heal you on every kill. Modules never appear in a level-up.',
+      'The reason to build this was measured, not thematic. Every number this game has ever produced says the same thing: run away forever. The kiting bot beats the charging one, and an entire weapon line was five times weaker for kiters. The cause was that nothing ever asked you to hold ground. A derelict asks.',
+      'Holding one costs you. Stripping a hulk diverts the reactor, so your weapons fire slower for exactly the seconds the field is closing in, and its beacon drops reinforcements around the wreck instead of around you. The first version made salvaging <em>spawn more enemies</em> and the win rate went <em>up</em> — in a game where a built player out-clears the spawn rate, extra enemies are extra XP. A cost you can convert into progress is not a cost.',
+      'Derelicts are optional on Recruit and part of the campaign above it: a Recruit run that ignores every one still clears about one time in four.',
+      'Fixed: a level-up and a salvage draw that landed on the same frame used to overwrite each other, and the unanswered offer was gone for good. Both are queued now.',
+      'Fixed, and it is the reason a bench exists: a missing tuning knob made the salvage penalty <code>NaN</code>, which silently stopped every weapon from firing while you stood in a wreck — <code>Math.max(0.06, NaN)</code> is <code>NaN</code>, and <code>t >= NaN</code> is never true. The sim now asserts that no player stat is ever a non-finite number.',
+      'Fixed a second viewport bug, this one live since v0.1 as well: a tab that loads in the background can report a window size of zero, and the game measured itself exactly once at load. The world became 0x0, which put the enemy spawn ring 110px away — enemies materialised inside your own reaction time. The size is now floored and re-measured when the tab is first shown.',
+      'Fixed: screen shake and thruster flicker drew from the simulation\'s random stream, so <em>drawing a frame advanced the world\'s RNG</em> and a given seed played out differently depending on how many frames were rendered. Cosmetic jitter has its own source now, and the browser and the headless sim run frame-for-frame identical from the same seed.',
+      'Balance: enemy health doubles every 84s (was 110), the Devourer has 330k health (was 175k). The Devourer now kills about a third of the players who reach it on Veteran.',
+    ],
+  },
   {
     v: 'v1.0', title: 'The Campaign',
     notes: [

@@ -1,5 +1,6 @@
 /** Movement policies shared by sim.mjs and bench.mjs. */
 import { G } from '../src/game.js';
+import { DERELICT } from '../src/content.js';
 
 export const BOTS = {
   // Baseline: blind circling. Deliberately bad — a floor, not a target.
@@ -29,6 +30,17 @@ export const BOTS = {
     const wander = t * 0.35;
     let x = fx * 1.0 + ox * 0.45 + Math.cos(wander) * 0.2;
     let y = fy * 1.0 + oy * 0.45 + Math.sin(wander) * 0.2;
+
+    // Derelicts. A competent player commits to one when healthy and keeps dodging
+    // *inside* the ring rather than leaving it, so the seek term is gentle once in
+    // and decisive when out. Below 42% health it is not worth the beacon.
+    const h = G.hulks[0];
+    if (h && p.hp / p.maxHp > 0.42) {
+      const dx = h.x - p.x, dy = h.y - p.y, d = Math.hypot(dx, dy) || 1;
+      const w = d < DERELICT.radius * 0.72 ? 0.45 : 1.9;
+      x += dx / d * w; y += dy / d * w;
+    }
+
     const l = Math.hypot(x, y) || 1;
     return { x: x / l, y: y / l };
   },

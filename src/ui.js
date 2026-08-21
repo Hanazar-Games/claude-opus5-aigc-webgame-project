@@ -1,18 +1,19 @@
-import { G, applyCard, newRun } from './game.js';
+import { G, applyCard, applyModule, newRun } from './game.js';
 import { WEAPONS, DIFFICULTIES, ACTS, FINAL_AT } from './content.js';
 import { fmtTime, fmtBig } from './util.js';
-import { sfx, unlockAudio, startMusic, stopMusic, setMusicPaused, setMusicFinal, setMuted, loadMuted, music } from './audio.js';
+import { sfx, unlockAudio, startMusic, stopMusic, setMusicPaused, setMusicFinal, salvageHum, setMuted, loadMuted, music } from './audio.js';
 import { VERSION, NEWS } from './news.js';
 
 const $ = id => document.getElementById(id);
 const el = {
   hud: $('hud'), overlay: $('overlay'),
   title: $('panel-title'), levelup: $('panel-levelup'), pause: $('panel-pause'),
-  over: $('panel-over'), win: $('panel-win'), news: $('panel-news'),
+  over: $('panel-over'), win: $('panel-win'), news: $('panel-news'), salvage: $('panel-salvage'),
   hpFill: $('hp-fill'), hpText: $('hp-text'), xpFill: $('xp-fill'), xpText: $('xp-text'),
   timer: $('timer'), kills: $('kills'), loadout: $('loadout'), cards: $('cards'),
   actTrack: $('act-track'), actFill: $('act-fill'), actName: $('act-name'),
-  finalBar: $('final-bar'), fbFill: $('fb-fill'), stage: $('stage'),
+  finalBar: $('final-bar'), fbFill: $('fb-fill'), stage: $('stage'), mods: $('mods'),
+  salvHud: $('salv-hud'),
 };
 
 const BEST_KEY = 'starfall.best.v2';      // per difficulty, since v1.0 tiers
@@ -30,7 +31,8 @@ const unlocked = id => id !== 'nightmare' || clears.includes('veteran');
 
 let prevPanel = 'title';
 function showPanel(name) {
-  for (const k of ['title', 'levelup', 'pause', 'over', 'win', 'news']) el[k].classList.toggle('hidden', k !== name);
+  salvageHum(false);          // every state change goes through here; nothing sustains across one
+  for (const k of ['title', 'levelup', 'pause', 'over', 'win', 'news', 'salvage']) el[k].classList.toggle('hidden', k !== name);
   el.overlay.classList.toggle('hidden', !name);
   el.hud.classList.toggle('hidden', name === 'title');
 }
@@ -82,9 +84,9 @@ export function initUI() {
 
   // level-up cards are pickable with 1 / 2 / 3
   addEventListener('keydown', ev => {
-    if (G.state === 'levelup') {
+    if (G.state === 'levelup' || G.state === 'salvage') {
       const i = ['Digit1', 'Digit2', 'Digit3'].indexOf(ev.code);
-      if (i >= 0) el.cards.children[i]?.click();
+      if (i >= 0) (G.state === 'salvage' ? el.mods : el.cards).children[i]?.click();
       return;
     }
     // Enter / Space runs the primary action of whatever panel is up, so a run can
@@ -100,6 +102,7 @@ export function initUI() {
   G.onDeath = showGameOver;
   G.onWin = showVictory;
   G.onAct = showActBanner;
+  G.onSalvage = showModules;
   showPanel('title');
 }
 
@@ -164,6 +167,20 @@ function buildNews() {
   $('news-old').innerHTML = NEWS.slice(1).map(entryHTML).join('');
 }
 
+/** Salvage draw. Same shape as a level-up, deliberately a different colour. */
+function showModules(mods) {
+  el.mods.innerHTML = '';
+  for (const m of mods) {
+    const d = document.createElement('button');
+    d.className = 'card mod';
+    d.innerHTML = `<kbd>${mods.indexOf(m) + 1}</kbd><div class="ico">${m.icon}</div>` +
+      `<div><h3>${m.name}</h3><p>${m.desc}</p></div>`;
+    d.addEventListener('click', () => { sfx.select(); applyModule(m); showPanel(null); });
+    el.mods.appendChild(d);
+  }
+  showPanel('salvage');
+}
+
 function showCards(cards) {
   el.cards.innerHTML = '';
   for (const c of cards) {
@@ -195,7 +212,8 @@ function fillResult(pre, won) {
     .join('');
   const evos = G.player.weapons.filter(w => WEAPONS[w.id].evolved).length;
   $(pre + 'extra').textContent = `${G.bossKills} mothership${G.bossKills === 1 ? '' : 's'} destroyed · ` +
-    `${evos} evolution${evos === 1 ? '' : 's'} · ${fmtBig(G.dmgDealt)} damage dealt`;
+    `${evos} evolution${evos === 1 ? '' : 's'} · ${G.salvaged} derelict${G.salvaged === 1 ? '' : 's'} stripped · ` +
+    `${fmtBig(G.dmgDealt)} damage dealt`;
 
   const b = bestOf(diff);
   const better = won ? (!b.won || G.time < b.time) : (!b.won && G.time > b.time);
@@ -254,5 +272,8 @@ export function syncHUD() {
     music.intensity = 1;
   } else music.intensity = 0.2 + 0.8 * Math.min(1, G.time / 150);
   el.kills.textContent = `☠ ${G.kills}`;
+  const hulk = G.hulks.find(h => h.active);
+  salvageHum(!!hulk, hulk ? hulk.p : 0);
+  el.salvHud.textContent = hulk ? `SALVAGING  ${Math.round(hulk.p * 100)}%  ·  HOLD POSITION` : '';
   syncLoadout();
 }

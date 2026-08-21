@@ -1,13 +1,22 @@
-import { TAU, rand, clamp } from './util.js';
+import { TAU, clamp } from './util.js';
+
+/**
+ * Cosmetic jitter has its OWN unseeded source. Screen shake and thruster flicker
+ * used to draw from util's `random()` — the same stream the simulation runs on —
+ * so drawing a frame advanced the world's RNG. The headless sim never renders, so
+ * "a given seed replays exactly" was true in Node and quietly false in the browser:
+ * the same seed produced a different run depending on how many frames were drawn.
+ */
+const jitter = (a = 1, b = 0) => b + Math.random() * (a - b);
 import { G } from './game.js';
-import { WEAPONS } from './content.js';
+import { WEAPONS, DERELICT } from './content.js';
 
 const AFFIX_TINT = { splitter: '#5cff9d', volley: '#ff4d5e', haste: '#4df3ff' };
 
 let stars = [];
 export function seedStars(n = 260) {
   stars = Array.from({ length: n }, () => ({
-    x: rand(4000, -2000), y: rand(4000, -2000), z: rand(1, 0.25), r: rand(1.6, 0.5),
+    x: jitter(4000, -2000), y: jitter(4000, -2000), z: jitter(1, 0.25), r: jitter(1.6, 0.5),
   }));
 }
 
@@ -40,6 +49,15 @@ function shape(ctx, kind, r, t) {
       }
       ctx.closePath(); break;
     }
+    // A broken hull: an outer plate ring with two teeth torn out of it.
+    case 'hulk': {
+      for (let i = 0; i < 9; i++) {
+        if (i === 3 || i === 7) continue;
+        const a = i * TAU / 9, rr = r * (i % 2 ? 0.68 : 1);
+        ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr);
+      }
+      ctx.closePath(); break;
+    }
     case 'boss': {
       for (let i = 0; i < 8; i++) {
         const a = i * TAU / 8 + t * 0.3, rr = r * (i % 2 ? 0.62 : 1);
@@ -57,8 +75,8 @@ export function render(ctx, w, h, dpr) {
   ctx.fillRect(0, 0, w, h);
   if (!p) return;
 
-  const sx = cam.shake ? rand(cam.shake, -cam.shake) : 0;
-  const sy = cam.shake ? rand(cam.shake, -cam.shake) : 0;
+  const sx = cam.shake ? jitter(cam.shake, -cam.shake) : 0;
+  const sy = cam.shake ? jitter(cam.shake, -cam.shake) : 0;
   const ox = w / 2 - cam.x + sx, oy = h / 2 - cam.y + sy;
 
   /* parallax starfield (wrapped around camera) */
@@ -92,10 +110,10 @@ export function render(ctx, w, h, dpr) {
   /* nova rings */
   for (const n of G.novas) {
     const k = n.t / n.dur;
-    ctx.globalAlpha = (1 - k) * 0.8;
-    ctx.strokeStyle = '#8f7bff';
-    ctx.lineWidth = 6 * (1 - k) + 1;
-    ctx.beginPath(); ctx.arc(n.x, n.y, n.r * (0.35 + k * 0.75), 0, TAU); ctx.stroke();
+    ctx.globalAlpha = (1 - k) * (n.calm ? 0.5 : 0.8);
+    ctx.strokeStyle = n.calm ? '#5cff9d' : '#8f7bff';
+    ctx.lineWidth = (n.calm ? 3 : 6) * (1 - k) + 1;
+    ctx.beginPath(); ctx.arc(n.x, n.y, n.r * (n.calm ? 0.8 + k * 0.3 : 0.35 + k * 0.75), 0, TAU); ctx.stroke();
   }
   ctx.globalAlpha = 1;
 
@@ -104,6 +122,45 @@ export function render(ctx, w, h, dpr) {
   ctx.shadowBlur = 10; ctx.shadowColor = '#4df3ff';
   for (const o of G.orbs) { ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, TAU); ctx.fill(); }
   ctx.shadowBlur = 0;
+
+  /* derelict hulks — the only thing on the field you have to stand still for */
+  for (const hk of G.hulks) {
+    const fade = Math.min(1, (DERELICT.life - hk.t) / 5);            // dims as it drifts off
+    const c = hk.active ? '#ffc44d' : '#c9a24a';
+    ctx.save();
+    ctx.globalAlpha = 0.85 * fade;
+
+    // the radius you have to be inside, dashed and turning
+    ctx.save();
+    ctx.translate(hk.x, hk.y); ctx.rotate(t * (hk.active ? 0.5 : 0.16));
+    ctx.strokeStyle = hk.active ? 'rgba(255,196,77,.55)' : 'rgba(201,162,74,.24)';
+    ctx.lineWidth = hk.active ? 2 : 1.4;
+    ctx.setLineDash([14, 12]);
+    ctx.beginPath(); ctx.arc(0, 0, DERELICT.radius, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // progress arc, drawn on the radius itself so it reads without looking away
+    if (hk.p > 0) {
+      ctx.strokeStyle = '#ffc44d'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+      ctx.shadowBlur = 14; ctx.shadowColor = '#ffc44d';
+      ctx.beginPath();
+      ctx.arc(hk.x, hk.y, DERELICT.radius, -Math.PI / 2, -Math.PI / 2 + TAU * hk.p);
+      ctx.stroke();
+      ctx.shadowBlur = 0; ctx.lineCap = 'butt';
+    }
+
+    ctx.save();
+    ctx.translate(hk.x, hk.y); ctx.rotate(hk.spin);
+    ctx.strokeStyle = c; ctx.fillStyle = 'rgba(255,196,77,.14)'; ctx.lineWidth = 2.4;
+    ctx.shadowBlur = hk.active ? 20 : 10; ctx.shadowColor = c;
+    shape(ctx, 'hulk', hk.r, t);
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
 
   /* pickups */
   for (const pk of G.pickups) {
@@ -231,7 +288,7 @@ export function render(ctx, w, h, dpr) {
   if (p.moving > 0.05) {
     ctx.fillStyle = `rgba(255,196,77,${0.5 * p.moving})`;
     ctx.beginPath();
-    ctx.moveTo(-p.r * 0.8, -4); ctx.lineTo(-p.r * 0.8 - 14 * p.moving - rand(6), 0); ctx.lineTo(-p.r * 0.8, 4);
+    ctx.moveTo(-p.r * 0.8, -4); ctx.lineTo(-p.r * 0.8 - 14 * p.moving - jitter(6), 0); ctx.lineTo(-p.r * 0.8, 4);
     ctx.closePath(); ctx.fill();
   }
   ctx.fillStyle = 'rgba(77,243,255,.25)';
@@ -277,6 +334,7 @@ export function render(ctx, w, h, dpr) {
   };
   for (const e of G.enemies) if (e.boss) marker(e.x, e.y, e.def.final ? '#ff2f6d' : '#ff4d5e'); else if (e.elite) marker(e.x, e.y, '#ffd24d');
   for (const pk of G.pickups) marker(pk.x, pk.y, pk.kind === 'heal' ? '#5cff9d' : pk.kind === 'magnet' ? '#4df3ff' : '#ffc44d');
+  for (const hk of G.hulks) marker(hk.x, hk.y, '#ffc44d');
   ctx.globalAlpha = 1;
 
   /* low-hp vignette */
