@@ -38,9 +38,16 @@ function showPanel(name) {
 }
 
 export function initUI() {
-  Object.assign(best, load(BEST_KEY, {}));
-  clears = load(CLEAR_KEY, []);
-  diff = load('starfall.diff', 'veteran');
+  // Saved state is validated, not trusted. A half-written or hand-edited entry used
+  // to throw straight out of initUI — `clears.includes` on a number, or a bad
+  // difficulty id reaching `.name` — and the whole UI never finished building, which
+  // is unrecoverable because the failure is the thing that draws the reset.
+  const savedBest = load(BEST_KEY, {});
+  if (savedBest && typeof savedBest === 'object' && !Array.isArray(savedBest)) Object.assign(best, savedBest);
+  const savedClears = load(CLEAR_KEY, []);
+  clears = Array.isArray(savedClears) ? savedClears.filter(id => DIFFICULTIES.some(d => d.id === id)) : [];
+  const savedDiff = load('starfall.diff', 'veteran');
+  diff = DIFFICULTIES.some(d => d.id === savedDiff) ? savedDiff : 'veteran';
   if (!unlocked(diff)) diff = 'veteran';
   buildDiffs();
 
@@ -92,6 +99,9 @@ export function initUI() {
     // Enter / Space runs the primary action of whatever panel is up, so a run can
     // be restarted without reaching for the mouse.
     if (ev.code !== 'Enter' && ev.code !== 'Space') return;
+    // A focused button already handles Enter/Space itself. Without this, tabbing to
+    // a difficulty and pressing Space both picked the tier AND started the run.
+    if (document.activeElement?.tagName === 'BUTTON') return;
     const panel = ['title', 'over', 'win', 'pause'].find(k => !el[k].classList.contains('hidden'));
     if (!panel) return;
     ev.preventDefault();
@@ -148,10 +158,34 @@ function showActBanner(act) {
   if (final) { el.actTrack.classList.add('hidden'); el.finalBar.classList.remove('hidden'); }
 }
 
+/**
+ * What the run has actually become. Six versions of stacking percentages and the
+ * game never told you the total — you could take Weak Point Analysis past the
+ * point where crit is capped and nothing anywhere would say so.
+ */
+function statSheet() {
+  const p = G.player;
+  const pct = v => Math.round(v * 100) + '%';
+  const rows = [
+    ['DMG', '×' + p.damage.toFixed(2)],
+    ['RATE', '×' + (1 / p.rate).toFixed(2)],
+    ['CRIT', p.crit >= 1 ? '100% MAX' : pct(p.crit)],
+    ['AREA', '×' + p.area.toFixed(2)],
+    ['RANGE', '×' + p.range.toFixed(2)],
+    ['SPEED', Math.round(p.speed)],
+    ['ARMOR', '−' + pct(1 - p.armor) + ' taken'],
+    ['REGEN', p.regen.toFixed(1) + '/s'],
+    ['MAGNET', Math.round(p.pickup)],
+    ['XP', '×' + p.xpMult.toFixed(2)],
+  ];
+  return rows.map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join('');
+}
+
 export function togglePause() {
   if (G.state === 'playing') {
     $('pause-info').textContent =
       `${DIFFICULTIES.find(d => d.id === diff).name} · ${ACTS[G.act].name} · ${fmtTime(G.time)} · Lv.${G.player.level}`;
+    $('pause-stats').innerHTML = statSheet();
     G.state = 'paused'; showPanel('pause'); setMusicPaused(true);
   }
   else if (G.state === 'paused') { G.state = 'playing'; showPanel(null); setMusicPaused(false); }
@@ -256,6 +290,8 @@ function fillResult(pre, won) {
 
 function showGameOver() {
   stopMusic();
+  // where the run ended matters in a campaign; "04:17" alone does not say it
+  $('r-where').textContent = G.final ? 'FELL TO THE DEVOURER' : `LOST IN ${ACTS[G.act].name}`;
   fillResult('r-', false);
   setTimeout(() => showPanel('over'), 700);
 }

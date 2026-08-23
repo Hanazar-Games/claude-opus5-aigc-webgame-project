@@ -1,7 +1,20 @@
 /** Version + patch notes. `NEWS[0]` is the current announcement; the rest is history. */
-export const VERSION = 'v1.2';
+export const VERSION = 'v1.3';
 
 export const NEWS = [
+  {
+    v: 'v1.3', title: 'Signal Clarity',
+    notes: [
+      'Fixed: whenever the main thread stalled — a long garbage collection, a slow phone, a heavy first frame — the soundtrack fired <b>the entire arrangement at once</b> as a single blast. Notes are scheduled ahead of the audio clock, and the catch-up loop replayed every missed step at a time already in the past, which WebAudio plays immediately. Measured after a 2s stall: seven steps scheduled, six of them up to 1.6s overdue. The scheduler now skips the gap instead of replaying it.',
+      'Fixed: on the title screen, moving to a difficulty with the keyboard and pressing Space both picked the tier <em>and</em> started the run.',
+      'The pause menu now shows what your run has actually become — damage, fire rate, crit, area, range, speed, armour, regen, magnet and XP as real totals. Six versions of stacking percentages and the game never told you the sum, so you could keep taking Weak Point Analysis long after crit was capped and nothing would say so.',
+      'The results screen says which act you died in. "04:10" alone does not tell you how far you got.',
+      'The Devourer announces its phases. Two thresholds decide that fight and both used to pass in silence.',
+      'A derelict drifting away unstripped now has a sound, not just a small grey word on the far side of the screen.',
+      'Saved progress is validated rather than trusted: a half-written or hand-edited entry used to throw straight out of start-up and leave nothing on screen at all.',
+      'Checked and left alone: rendering. It has never been measured in this project, so it was — 0.6ms for a worst-case frame of 216 enemies, 950 particles, 222 shots and 122 damage numbers at 1920×1080. There was nothing to fix.',
+    ],
+  },
   {
     v: 'v1.2', title: 'Audit',
     notes: [

@@ -110,6 +110,10 @@ export const sfx = {
     [1046.5, 1318.5, 1568].forEach((f, i) => tone({ freq: f, dur: 1.5, type: 'sine', vol: 0.13, delay: 0.55 + i * 0.02 }));
   },
   act: () => [0, 0.11].forEach((d, i) => tone({ freq: 330 * (i + 1), to: 494 * (i + 1), dur: 0.42, type: 'sine', vol: 0.15 - i * 0.05, delay: d })),
+  // a wreck drifting away deserves more than a small grey word on the far side of the screen
+  hulkLost: () => [0, 0.14].forEach((d, i) => tone({ freq: 330 - i * 90, to: 190 - i * 60, dur: 0.4, type: 'triangle', vol: 0.13, delay: d })),
+  // the Devourer shedding a phase
+  phase: () => { tone({ freq: 110, to: 62, dur: 0.6, type: 'sawtooth', vol: 0.26 }); noise({ dur: 0.4, vol: 0.14, freq: 500 }); },
   // derelicts: a sonar ping to find one, a hull-plate clang to finish one
   hulk: () => [0, 0.26].forEach(d => tone({ freq: 1180, to: 1180, dur: 0.3, type: 'sine', vol: 0.11, delay: d })),
   salvage: () => {
@@ -232,6 +236,14 @@ function scheduleStep(i, at) {
 
 function tick() {
   if (!ctx) return;
+  // A stalled main thread — a long GC, a slow device, a heavy first frame — leaves
+  // nextTime seconds behind the audio clock while the timer was not running. The
+  // catch-up loop then schedules every missed step at a time in the PAST, and
+  // WebAudio starts a past time immediately: measured after a 2s stall, one tick
+  // scheduled 7 steps with 6 of them up to 1.6s overdue, so the bass, arp,
+  // counter-melody and the whole drum kit fired at once as a single blast.
+  // Skip the gap rather than replaying it.
+  if (nextTime < ctx.currentTime) nextTime = ctx.currentTime + 0.02;
   while (nextTime < ctx.currentTime + 0.2) {
     scheduleStep(step++, nextTime);
     nextTime += STEP_DUR;

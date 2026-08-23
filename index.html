@@ -48,7 +48,7 @@
       <button class="btn" data-action="news">WHAT'S NEW <span id="ver-badge" class="ver"></span></button>
       <div class="best">Best: <span id="best-title">--</span></div>
       <label class="toggle"><input type="checkbox" class="mute-box"> Mute</label>
-      <p class="hint">WASD / Arrows to move · Drag anywhere on touch · P to pause</p>
+      <p class="hint">WASD / Arrows to move · Drag anywhere on touch · P to pause<br>Hold position inside a derelict's ring to strip it</p>
     </div>
 
     <div id="panel-levelup" class="panel hidden">
@@ -66,6 +66,7 @@
     <div id="panel-pause" class="panel hidden">
       <h2>PAUSED</h2>
       <p id="pause-info" class="sub"></p>
+      <div id="pause-stats" class="statsheet"></div>
       <button class="btn primary" data-action="resume">RESUME</button>
       <button class="btn" data-action="quit">ABANDON RUN</button>
       <button class="btn" data-action="news">PATCH NOTES</button>
@@ -101,6 +102,7 @@
 
     <div id="panel-over" class="panel hidden">
       <h2 class="dead">SIGNAL LOST</h2>
+      <p id="r-where" class="sub"></p>
       <div class="result">
         <div><b id="r-time">00:00</b><span>SURVIVED</span></div>
         <div><b id="r-kills">0</b><span>KILLS</span></div>

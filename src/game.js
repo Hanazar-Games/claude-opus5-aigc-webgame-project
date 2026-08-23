@@ -308,7 +308,7 @@ function director(dt) {
   if (t >= FINAL_AT && !G.final) {
     spawnEnemy('devourer', { x: G.player.x, y: G.player.y - 460 });
     G.final = G.enemies[G.enemies.length - 1];
-    G.final.rage = 0; G.final.spiral = 0; G.final.burst = 0; G.final.summon = 6;
+    G.final.rage = 0; G.final.spiral = 0; G.final.burst = 0; G.final.summon = 6; G.final.phase = 1;
     G.cam.shake = 26; sfx.devourer();
     return;                                   // no chaff wave on the frame it lands
   }
@@ -607,6 +607,7 @@ function updateHulks(dt) {
     } else if (h.t > DERELICT.life) {
       h.done = true; G.hulksLost++;
       G.texts.push({ x: h.x, y: h.y, t: 0, v: 'LOST', color: '#8a97b8', life: 1.2 });
+      sfx.hulkLost();
     }
   }
   if (G.hulks.some(h => h.done)) G.hulks = G.hulks.filter(h => !h.done);
@@ -647,7 +648,13 @@ function updateDevourer(e, dt) {
   // The first `rageRamp` seconds are unchanged, so the tuned fight is untouched.
   e.rage = (G.time - FINAL_AT) / TUNE.rageRamp;
   const r = Math.min(1, e.rage), over = Math.max(0, e.rage - 1);
-  e.phase = k < 0.33 ? 3 : k < 0.66 ? 2 : 1;
+  const phase = k < 0.33 ? 3 : k < 0.66 ? 2 : 1;
+  if (phase !== e.phase) {           // the fight has three acts of its own; say so
+    e.phase = phase;
+    G.cam.shake = Math.max(G.cam.shake, 16);
+    sfx.phase();
+    G.texts.push({ x: e.x, y: e.y - e.r - 26, t: 0, v: `PHASE ${phase}`, color: '#ff2f6d', big: true, life: 1.6 });
+  }
   e.speed = e.def.speed * (1 + r * 0.9 + over * 0.85 + (e.phase - 1) * 0.16);
   e.dmg = e.def.dmg * G.diff.dmg * (1 + scaleT() / 200) * (1 + over * 1.3);
 
