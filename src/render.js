@@ -282,10 +282,18 @@ export function render(ctx, w, h, dpr) {
   /* player */
   ctx.save();
   ctx.translate(p.x, p.y);
-  if (p.invuln > 0 && ((p.invuln * 20) | 0) % 2) ctx.globalAlpha = 0.35;
   // pickup radius hint
   ctx.strokeStyle = 'rgba(77,243,255,.07)'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.arc(0, 0, p.pickup, 0, TAU); ctx.stroke();
+  // A cut-out disc under the ship. With fifty enemies on screen the player was
+  // genuinely hard to find — a small neon triangle among a hundred other neon
+  // shapes — and during invulnerability frames it faded to 0.35 alpha and vanished
+  // outright. Clear a patch of background first, then never fade below half.
+  ctx.fillStyle = 'rgba(5,6,13,.85)';
+  ctx.beginPath(); ctx.arc(0, 0, p.r + 9, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(77,243,255,.5)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, 0, p.r + 9, 0, TAU); ctx.stroke();
+  if (p.invuln > 0 && ((p.invuln * 20) | 0) % 2) ctx.globalAlpha = 0.55;
   ctx.rotate(p.dir);
   if (p.moving > 0.05) {
     ctx.fillStyle = `rgba(255,196,77,${0.5 * p.moving})`;
@@ -293,9 +301,9 @@ export function render(ctx, w, h, dpr) {
     ctx.moveTo(-p.r * 0.8, -4); ctx.lineTo(-p.r * 0.8 - 14 * p.moving - jitter(6), 0); ctx.lineTo(-p.r * 0.8, 4);
     ctx.closePath(); ctx.fill();
   }
-  ctx.fillStyle = 'rgba(77,243,255,.25)';
-  ctx.strokeStyle = '#4df3ff'; ctx.lineWidth = 2.2;
-  ctx.shadowBlur = 16; ctx.shadowColor = '#4df3ff';
+  ctx.fillStyle = 'rgba(77,243,255,.55)';
+  ctx.strokeStyle = '#eafcff'; ctx.lineWidth = 2.4;
+  ctx.shadowBlur = 22; ctx.shadowColor = '#4df3ff';
   shape(ctx, 'tri', p.r, t);
   ctx.fill(); ctx.stroke();
   ctx.restore();

@@ -120,6 +120,14 @@ export const sfx = {
     [392, 523.25, 659.25, 880].forEach((f, i) => tone({ freq: f, dur: 0.34, type: 'triangle', vol: 0.19, delay: i * 0.075 }));
     noise({ dur: 0.2, vol: 0.14, freq: 2400 });
   },
+  // A shotgun has to sound like one: a filtered noise crack over a low thump, and
+  // it gets heavier as the gun grows more pellets. This is the sound the player
+  // hears most in the whole game, so it is gated like the other combat voices.
+  shotgun: n => gate('shotgun', 0.05, () => {
+    const heft = Math.min(1, n / 14);
+    noise({ dur: 0.13 + heft * 0.07, vol: 0.1 + heft * 0.08, freq: 1900 - heft * 700 });
+    tone({ freq: 210 - heft * 60, to: 70, dur: 0.11 + heft * 0.06, type: 'square', vol: 0.07 + heft * 0.06 });
+  }),
   pdef: () => gate('pdef', 0.2, () => { tone({ freq: 2200, to: 640, dur: 0.09, type: 'square', vol: 0.09 }); noise({ dur: 0.06, vol: 0.07, freq: 3600 }); }),
   select: () => tone({ freq: 620, to: 900, dur: 0.09, type: 'sine', vol: 0.18 }),
   heal: () => [523, 784].forEach((f, i) => tone({ freq: f, dur: 0.18, type: 'sine', vol: 0.2, delay: i * 0.07 })),

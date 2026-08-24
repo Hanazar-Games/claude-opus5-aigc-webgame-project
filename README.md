@@ -15,7 +15,8 @@ inside one long enough and you strip it for a module you cannot get any other wa
 
 - **Move** — `WASD` / arrow keys, or drag anywhere on a touch screen for a virtual stick
 - **Shoot** — automatic. Most weapons hit the nearest enemy; missiles and beams prioritise the Mothership
-- **Grow** — kills drop stardust; collect it to level up and pick 1 of 3 cards
+- **Grow** — kills drop stardust; collect it to level up and pick 1 of 3 cards (or press `1` / `2` / `3`)
+- The first six levels offer **weapons only** — no stat cards to read while the gun is still growing
 - **Pause** — `P` / `Esc` / the button in the corner. Level-up cards can also be picked with `1` / `2` / `3`
 - **Salvage** — a **derelict** drifts in every ~90s. Hold position inside its ring to strip it
 - **Win** — survive four acts and destroy **The Devourer**, which arrives at 7:00 and does not leave
@@ -32,7 +33,7 @@ inside one long enough and you strip it for a module you cannot get any other wa
 
 | Act | From | What changes |
 | --- | --- | --- |
-| Debris Field | 0:00 | Drifters and Shriekers. Room to build |
+| Debris Field | 0:00 | Drifters and Shriekers. Room to build; the horde starts arriving at 1:00 |
 | The Hunt | 2:10 | Bulwarks, Spitters, Weavers. The first Motherships matter |
 | Swarm Tide | 4:30 | Density, clusters, elites with modifiers |
 | The Devourer | 7:00 | One fight. Chaff spawns drop to a fifth |
@@ -83,7 +84,7 @@ about one time in four — and part of the campaign above it.
 
 | Weapon | Behaviour |
 | --- | --- |
-| 🔫 Pulse Gun | Starting weapon. Fires at the nearest target; splits and pierces at higher levels |
+| 🔫 Pulse Gun | Starting weapon, and the whole progression. One bolt at Lv.1, a five-pellet spread at Lv.2, nine and piercing at Lv.4 — the gun you start with **becomes a shotgun**, and you watch it happen |
 | 🚀 Seeker Missiles | Home in on targets and blast on impact |
 | ⚡ Annihilation Beam | High-speed beam that pierces everything in a line |
 | 💥 Starburst | Periodic shockwave centred on you, knocking enemies back |
@@ -97,7 +98,7 @@ Funnelling one line beats spreading yourself thin.
 
 | Evolution | Recipe | Effect |
 | --- | --- | --- |
-| 🌠 Starbreaker | Pulse Gun + Weak Point Analysis | One shot that tears through the entire field |
+| 🎆 Flak Cannon | Pulse Gun + Weak Point Analysis | A wall of fourteen pellets that shoves everything back |
 | 🛰 Hive | Seeker Missiles + Rapid Cycling | Six hard-locking missiles per volley |
 | ✳ Prism Storm | Annihilation Beam + Overload | Six piercing beams radiating out from you |
 | 🕳 Singularity | Starburst + Field Expansion | Drags enemies in and shreds them |

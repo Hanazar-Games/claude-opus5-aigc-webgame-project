@@ -1,7 +1,19 @@
 /** Version + patch notes. `NEWS[0]` is the current announcement; the rest is history. */
-export const VERSION = 'v1.3';
+export const VERSION = 'v1.4';
 
 export const NEWS = [
+  {
+    v: 'v1.4', title: 'The Gun',
+    notes: [
+      '<b>Your gun becomes a shotgun.</b> The Pulse Gun fires one bolt at Lv.1, a <b>five-pellet spread</b> at Lv.2, seven at Lv.3, and nine that punch through at Lv.4. The first upgrade you are ever offered nearly quadruples its damage, and you can see the spread widen every time.',
+      'Its evolution is now the <b>Flak Cannon</b>: fourteen pellets in a wall, with enough force behind them to shove a crowd backwards. It replaces Starbreaker, which was a single-beam railgun on the end of what is now a shotgun.',
+      'The first six levels offer <b>weapons only</b> — no stat cards while the gun is still growing. Levelling the weapon in your hands is weighted far above picking up a second one, so the opening is about one thing.',
+      '<b>Far more enemies.</b> The horde starts arriving a minute in and builds from there: about 27 on screen in the mid-game against 12 before, and roughly 26,000 kills in a full run against 5,000. Runs are still the same length — the enemies are many, weak and individually far less dangerous.',
+      'You start with 170 health instead of 120, and the density ramp holds off for the first minute, so the opening is for learning what the gun does rather than dying to a crowd.',
+      'Fixed, and caused by the change above: at fifty enemies on screen <b>the player was genuinely hard to find</b> — a small neon triangle among a hundred other neon shapes, fading to a third opacity during invulnerability frames. The ship now sits in a cut-out disc and never fades below half.',
+      'Fewer, weightier level-ups: a full run is about 39 now rather than 45+, so there is less time in menus and more in the fight.',
+    ],
+  },
   {
     v: 'v1.3', title: 'Signal Clarity',
     notes: [

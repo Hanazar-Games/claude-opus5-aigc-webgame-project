@@ -7,8 +7,9 @@ const ENEMY_CAP = 380;
 const CELL = 64;
 
 /** Knobs the balance sim can sweep (see `node tools/sim.mjs --sweep`). */
-export const TUNE = { hpDouble: 84, orbLag: 1.0, spawnRamp: 24, xpCurve: 0.16, finalHp: 330000, orbHome: 7, rageRamp: 95, salvageHeat: 1.5, salvageChoke: 1.85,
-  hulkFirst: 46, hulkEvery: 88 };
+export const TUNE = { hpDouble: 120, orbLag: 1.0, spawnRamp: 3, xpCurve: 0.27, finalHp: 330000, orbHome: 7, rageRamp: 95, salvageHeat: 1.5, salvageChoke: 1.85,
+  hulkFirst: 46, hulkEvery: 88,
+  spawnBase: 3.2, spawnDelay: 60, gunLevels: 6, startHp: 170 };
 
 export const G = {
   state: 'title',
@@ -36,7 +37,7 @@ export function newRun(diffId = 'veteran') {
   G.modal.length = 0; G.offer = null;
   G.cam.x = G.cam.y = 0; G.cam.shake = 0;
   G.player = {
-    x: 0, y: 0, r: 13, hp: 120, maxHp: 120, speed: 178,
+    x: 0, y: 0, r: 13, hp: TUNE.startHp, maxHp: TUNE.startHp, speed: 178,
     damage: 1, rate: 1, armor: 1, pickup: 125, crit: 0.05, area: 1, xpMult: 1, regen: 0,
     slots: 4, range: 1, pointDef: 0, pointDefT: 0, lifesteal: 0, reactive: 0,
     modules: [],
@@ -121,7 +122,7 @@ G.spawnBullet = o => {
     vx: Math.cos(o.a) * o.speed, vy: Math.sin(o.a) * o.speed,
     a: o.a, r: o.r, dmg: o.dmg * G.player.damage, life: o.life,
     pierce: o.pierce || 0, color: o.color, homing: o.homing || 0,
-    blast: o.blast || 0, beam: !!o.beam, trail: !!o.trail, hit: null,
+    blast: o.blast || 0, beam: !!o.beam, trail: !!o.trail, knock: o.knock || 0, hit: null,
   });
 };
 
@@ -330,7 +331,10 @@ function director(dt) {
   // ring, which is the screen. Left alone that made the same difficulty tier a
   // different game per window: 77 enemies alive on a 900x620 desktop against 47 on
   // a 420x780 phone, and a 31% win rate against 59%. Cancel the screen out.
-  const rate = (0.45 + Math.min(t, FINAL_AT) / TUNE.spawnRamp)
+  // The density ramp starts AFTER spawnDelay. The first minute is when the gun is
+  // still growing from one bolt to a spread, and a field that saturates before then
+  // just kills you while you are learning what the weapon does.
+  const rate = (TUNE.spawnBase + Math.max(0, Math.min(t, FINAL_AT) - TUNE.spawnDelay) / TUNE.spawnRamp)
     * (G.final ? 0.22 : bossFight ? 0.5 : 1) * G.diff.spawn * (REF_RING / spawnRing())
     * (salvaging() ? TUNE.salvageHeat : 1);
   G.spawnAcc += dt * rate;
@@ -379,7 +383,7 @@ export function update(dt) {
     if (def.orbital) { w.angle = (w.angle + s.spin * dt / choke) % TAU; continue; }
     w.t += dt;
     const cd = Math.max(0.06, s.cd * p.rate * choke);
-    if (w.t >= cd) { w.t = 0; def.fire(G, s); if (w.id !== 'nova') sfx.shoot(); }
+    if (w.t >= cd) { w.t = 0; def.fire(G, s); if (!def.ownSfx && w.id !== 'nova') sfx.shoot(); }
   }
   updateOrbitals(dt, choke);
 
@@ -463,6 +467,10 @@ export function update(dt) {
       if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 > rr * rr) continue;
       if (b.hit && b.hit.has(e)) continue;
       damageEnemy(e, b.dmg);
+      if (b.knock && !e.boss) {
+        const d = Math.hypot(b.vx, b.vy) || 1;
+        e.vx += b.vx / d * b.knock; e.vy += b.vy / d * b.knock;
+      }
       if (b.blast) { G.novaBlast(b.x, b.y, b.blast, b.dmg * 0.6, 90); b.life = 0; break; }
       if (b.pierce > 0) { b.pierce--; (b.hit ||= new Set()).add(e); }
       else { b.life = 0; break; }
@@ -785,9 +793,15 @@ export function rollCards() {
     const evo = WEAPONS[w.id].evo, def = WEAPONS[evo.id];
     pool.push({ kind: 'evo', id: evo.id, base: w.id, icon: def.icon, name: def.name, desc: def.desc(1), weight: 40 });
   }
+  // The opening is about the gun and nothing else. For the first few levels the
+  // pool holds weapons only — no stat cards to read, and levelling the weapon you
+  // are already holding is weighted far above picking up a second one. By level 5
+  // the starting gun has gone from one bolt to a seven-pellet spread, and the
+  // player watched every step of it happen.
+  const gunFirst = p.level <= TUNE.gunLevels;
   for (const [id, w] of owned) {
     if (w.lv < WEAPONS[id].max)
-      pool.push({ kind: 'up', id, icon: WEAPONS[id].icon, name: `${WEAPONS[id].name} Lv.${w.lv + 1}`, desc: WEAPONS[id].desc(w.lv + 1), weight: 5 });
+      pool.push({ kind: 'up', id, icon: WEAPONS[id].icon, name: `${WEAPONS[id].name} Lv.${w.lv + 1}`, desc: WEAPONS[id].desc(w.lv + 1), weight: gunFirst ? 14 : 5 });
   }
   if (owned.size < p.slots)
     for (const id of Object.keys(WEAPONS)) {
@@ -795,9 +809,9 @@ export function rollCards() {
       // Never re-offer a base weapon once its evolution is owned: taking it would
       // burn a slot on a strictly worse version of something you already have.
       if (owned.has(id) || def.evolved || (def.evo && owned.has(def.evo.id))) continue;
-      pool.push({ kind: 'new', id, icon: def.icon, name: def.name, desc: def.desc(1), weight: 4 });
+      pool.push({ kind: 'new', id, icon: def.icon, name: def.name, desc: def.desc(1), weight: gunFirst ? 3 : 4 });
     }
-  for (const s of STAT_UPGRADES) {
+  if (!gunFirst) for (const s of STAT_UPGRADES) {
     // Nudge the stat that would unlock a pending evolution.
     const unlocks = p.weapons.some(w => {
       const def = WEAPONS[w.id];

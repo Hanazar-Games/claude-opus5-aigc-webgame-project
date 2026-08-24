@@ -1,27 +1,31 @@
 // All game content: weapons, enemies, upgrades. Pure data + small fire hooks.
 import { TAU, rand } from './util.js';
+import { sfx } from './audio.js';
 
 /* ------------------------------------------------------------------ weapons */
 // stats(lv) returns the numbers for that level. fire(G, w, s) spawns things.
 export const WEAPONS = {
   blaster: {
-    evo: { id: 'railgun', stat: 'crit' },
-    name: 'Pulse Gun', icon: '🔫', max: 4,
-    desc: lv => (lv >= 3 ? 'Fires 2 bolts' : 'Fires a bolt') + ' at the nearest target'
-      + (lv >= 4 ? ', piercing one extra enemy' : ''),
-    stats: lv => ({ cd: 0.58 - lv * 0.045, dmg: 14 + lv * 7, count: lv >= 3 ? 2 : 1, pierce: lv >= 4 ? 1 : 0, speed: 560 }),
+    evo: { id: 'flak', stat: 'crit' },
+    name: 'Pulse Gun', icon: '🔫', max: 4, ownSfx: true,
+    // The gun IS the progression. Every level adds pellets and widens the cone, so
+    // by Lv.4 the weapon you started with is a shotgun — you can see it happen.
+    // Counts are always ODD so one pellet is always dead on the crosshair: an even
+    // volley straddles the target and at range every pellet misses (that shipped
+    // once, in v0.8, and it is why bench.mjs asserts a level-up cannot lose damage).
+    desc: lv => lv === 1 ? 'Fires a bolt at the nearest target'
+      : `Fires ${1 + lv * 2} pellets in a spread` + (lv >= 4 ? ', each punching through one enemy' : ''),
+    stats: lv => ({ cd: 0.54 - lv * 0.045, dmg: lv === 1 ? 20 : 11 + lv * 1.5, count: lv === 1 ? 1 : 1 + lv * 2,
+      cone: lv === 1 ? 0 : 0.1 + lv * 0.08, pierce: lv >= 4 ? 1 : 0, speed: 620, life: 0.58 }),
     fire(G, s) {
-      const t = G.nearestEnemy(G.player, 400); if (!t) return;
-      const dx = t.x - G.player.x, dy = t.y - G.player.y;
-      const base = Math.atan2(dy, dx);
-      // Spread is an angle derived from a fixed lateral gap AT THE TARGET. With a
-      // constant angle, an even-numbered volley straddles the target and both
-      // bolts sail past it at range — levelling the gun made it miss more.
-      const spread = Math.atan2(9, Math.max(40, Math.hypot(dx, dy)));
+      const t = G.nearestEnemy(G.player, 380); if (!t) return;
+      const base = Math.atan2(t.y - G.player.y, t.x - G.player.x);
       for (let i = 0; i < s.count; i++) {
-        const a = base + (i - (s.count - 1) / 2) * spread;
-        G.spawnBullet({ a, speed: s.speed, dmg: s.dmg, r: 4, pierce: s.pierce, color: '#4df3ff', life: 0.95 });
+        const a = base + (s.count === 1 ? 0 : (i / (s.count - 1) - 0.5) * s.cone);
+        G.spawnBullet({ a, speed: s.speed * rand(1.08, 0.92), dmg: s.dmg, r: 4, pierce: s.pierce,
+          color: '#4df3ff', life: s.life });
       }
+      sfx.shotgun(s.count);
     },
   },
   missile: {
@@ -68,14 +72,19 @@ export const WEAPONS = {
   },
 
   /* --- evolutions: max-level weapon + 2 picks of its paired stat --- */
-  railgun: {
-    name: 'Starbreaker', icon: '🌠', max: 1, evolved: true, from: 'Pulse Gun + Weak Point Analysis',
-    desc: () => 'One shot that tears through the entire field',
-    stats: () => ({ cd: 0.55, dmg: 205, pierce: 99, speed: 1500, w: 10 }),
+  flak: {
+    name: 'Flak Cannon', icon: '🎆', max: 1, evolved: true, ownSfx: true, from: 'Pulse Gun + Weak Point Analysis',
+    desc: () => 'A wall of fourteen pellets that shoves everything back',
+    stats: () => ({ cd: 0.5, dmg: 26, count: 14, cone: 0.95, pierce: 2, speed: 700, life: 0.62 }),
     fire(G, s) {
-      const t = G.nearestEnemy(G.player, 700, 0, true); if (!t) return;
-      const a = Math.atan2(t.y - G.player.y, t.x - G.player.x);
-      G.spawnBullet({ a, speed: s.speed, dmg: s.dmg, r: s.w, pierce: s.pierce, color: '#fff2a8', life: 0.75, beam: true });
+      const t = G.nearestEnemy(G.player, 460, 0, true);
+      const base = t ? Math.atan2(t.y - G.player.y, t.x - G.player.x) : rand(TAU);
+      for (let i = 0; i < s.count; i++) {
+        const a = base + (i / (s.count - 1) - 0.5) * s.cone;
+        G.spawnBullet({ a, speed: s.speed * rand(1.1, 0.9), dmg: s.dmg, r: 5, pierce: s.pierce,
+          color: '#ffd24d', life: s.life, knock: 210 });
+      }
+      sfx.shotgun(s.count);
     },
   },
   swarm: {
@@ -118,12 +127,12 @@ export const WEAPONS = {
 
 /* ------------------------------------------------------------------ enemies */
 export const ENEMIES = {
-  drone: { name: 'Drifter', hp: 20, speed: 96, r: 11, dmg: 7, xp: 1, color: '#ff7ba8', shape: 'tri' },
-  darter: { name: 'Shrieker', hp: 12, speed: 152, r: 8, dmg: 6, xp: 1, color: '#ffd24d', shape: 'diamond' },
-  brute: { name: 'Bulwark', hp: 110, speed: 72, r: 20, dmg: 17, xp: 5, color: '#a77bff', shape: 'hex' },
+  drone: { name: 'Drifter', hp: 14, speed: 96, r: 11, dmg: 4, xp: 1, color: '#ff7ba8', shape: 'tri' },
+  darter: { name: 'Shrieker', hp: 9, speed: 152, r: 8, dmg: 4, xp: 1, color: '#ffd24d', shape: 'diamond' },
+  brute: { name: 'Bulwark', hp: 92, speed: 72, r: 20, dmg: 13, xp: 5, color: '#a77bff', shape: 'hex' },
   spitter: { name: 'Spitter', hp: 42, speed: 80, r: 13, dmg: 10, xp: 3, color: '#5cff9d', shape: 'square',
     shoot: { cd: 2.2, speed: 205, dmg: 11, count: 1 } },
-  weaver: { name: 'Weaver', hp: 70, speed: 112, r: 14, dmg: 11, xp: 4, color: '#4df3ff', shape: 'star', orbitStrafe: true },
+  weaver: { name: 'Weaver', hp: 58, speed: 112, r: 14, dmg: 9, xp: 4, color: '#4df3ff', shape: 'star', orbitStrafe: true },
   boss: { name: 'Mothership', hp: 900, speed: 78, r: 44, dmg: 34, xp: 90, color: '#ff4d5e', shape: 'boss', boss: true,
     shoot: { cd: 2.0, speed: 165, dmg: 16, count: 12 } },
   // The run ends on this thing, one way or the other. It does not use the shared
