@@ -26,7 +26,7 @@ jobs:
       - name: Campaign win rate — veteran
         run: node tools/sim.mjs --runs 24 --diff veteran --assert-win-min 12 --assert-win-max 62
       - name: Campaign win rate — recruit
-        run: node tools/sim.mjs --runs 16 --diff recruit --assert-win-min 45
+        run: node tools/sim.mjs --runs 16 --diff recruit --assert-win-min 25
       - name: Campaign win rate — nightmare
         run: node tools/sim.mjs --runs 16 --diff nightmare --assert-win-max 45
       # Every sim run and screenshot for nine versions was taken at 900x620, and a

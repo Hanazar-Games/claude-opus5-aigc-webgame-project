@@ -19,6 +19,26 @@ export const BOTS = {
       const w = (e.boss ? 2.5 : 1) * (330 - d) / 330 / d;
       fx += dx * w; fy += dy * w;
     }
+    // Bullets. The threat field used to contain enemies only, which was survivable
+    // while bullets were a minor damage source — but since the density rework they
+    // are 91% of everything the player takes, and a bot that walks straight through
+    // them is not a stand-in for a competent player, it is a broken instrument.
+    // Only bullets actually closing on us matter, and the dodge is sideways
+    // (perpendicular to the shot) the way a person dodges, not straight backwards.
+    for (const b of G.ebullets) {
+      const dx = p.x - b.x, dy = p.y - b.y;
+      const d = Math.hypot(dx, dy);
+      if (d > 200 || d < 1) continue;
+      if (b.vx * dx + b.vy * dy <= 0) continue;          // heading away: ignore
+      const w = (200 - d) / 200 / d * 2.6;
+      fx += dx * w; fy += dy * w;
+      // strafe to whichever side of the shot we are already on
+      const side = Math.sign(b.vx * dy - b.vy * dx) || 1;
+      const bl = Math.hypot(b.vx, b.vy) || 1;
+      fx += -b.vy / bl * side * w * 1.4;
+      fy += b.vx / bl * side * w * 1.4;
+    }
+
     const fl = Math.hypot(fx, fy);
     if (fl > 0) { fx /= fl; fy /= fl; }
     // pull toward the nearest orb that isn't in the danger direction

@@ -3,19 +3,20 @@ import { WEAPONS, ENEMIES, SPAWN_TABLE, BOSS_INTERVAL, STAT_UPGRADES, HEAL_CARD,
 import { sfx } from './audio.js';
 import { readMove } from './input.js';
 
-const ENEMY_CAP = 380;
+
 const CELL = 64;
 
 /** Knobs the balance sim can sweep (see `node tools/sim.mjs --sweep`). */
-export const TUNE = { hpDouble: 120, orbLag: 1.0, spawnRamp: 3, xpCurve: 0.27, finalHp: 330000, orbHome: 7, rageRamp: 95, salvageHeat: 1.5, salvageChoke: 1.85,
+export const TUNE = { hpDouble: 120, orbLag: 1.0, spawnRamp: 3, xpCurve: 0.27, finalHp: 95000, orbHome: 7, rageRamp: 95, salvageHeat: 1.5, salvageChoke: 1.85,
   hulkFirst: 46, hulkEvery: 88,
-  spawnBase: 3.2, spawnDelay: 60, gunLevels: 6, startHp: 170 };
+  spawnBase: 3.2, spawnDelay: 60, gunLevels: 6, startHp: 170,
+  eliteBase: 0.08, eliteRamp: 1400, dmgRamp: 200, contactMul: 1, enemyCap: 300, baseRegen: 5 };
 
 export const G = {
   state: 'title',
   time: 0, kills: 0, dmgDealt: 0, bossCount: 0, bossSpawns: 0, bossKills: 0,
   diff: DIFFICULTIES[1], act: 0, final: null,
-  nextHulk: 0, salvaged: 0, hulksLost: 0,
+  nextHulk: 0, salvaged: 0, hulksLost: 0, eliteAcc: 0,
   player: null,
   enemies: [], bullets: [], ebullets: [], orbs: [], pickups: [], parts: [], texts: [], novas: [], hulks: [],
   cam: { x: 0, y: 0, shake: 0 },
@@ -33,12 +34,17 @@ export function newRun(diffId = 'veteran') {
   G.time = 0; G.kills = 0; G.dmgDealt = 0; G.bossCount = 0; G.bossSpawns = 0; G.bossKills = 0; G.spawnAcc = 0; G.nextBoss = BOSS_INTERVAL;
   G.enemies.length = G.bullets.length = G.ebullets.length = 0;
   G.orbs.length = G.pickups.length = G.parts.length = G.texts.length = G.novas.length = G.hulks.length = 0;
-  G.nextHulk = TUNE.hulkFirst; G.salvaged = 0; G.hulksLost = 0;
+  G.nextHulk = TUNE.hulkFirst; G.salvaged = 0; G.hulksLost = 0; G.eliteAcc = 0;
   G.modal.length = 0; G.offer = null;
   G.cam.x = G.cam.y = 0; G.cam.shake = 0;
   G.player = {
     x: 0, y: 0, r: 13, hp: TUNE.startHp, maxHp: TUNE.startHp, speed: 178,
-    damage: 1, rate: 1, armor: 1, pickup: 125, crit: 0.05, area: 1, xpMult: 1, regen: 0,
+    damage: 1, rate: 1, armor: 1, pickup: 125, crit: 0.05, area: 1, xpMult: 1,
+    // A horde game chips at you every second, so it has to give a little back every
+    // second. Until v1.5 that came from elite drops — forty-nine heal pickups a
+    // minute, which was an accident of the density rework, not a design. This is the
+    // same sustain, made intentional, quiet and tunable.
+    regen: TUNE.baseRegen,
     slots: 4, range: 1, pointDef: 0, pointDefT: 0, lifesteal: 0, reactive: 0,
     modules: [],
     level: 1, xp: 0, xpNext: 5, invuln: 0, dir: -Math.PI / 2, moving: 0, picks: {},
@@ -256,7 +262,7 @@ function spawnPoint() {
   return { x: G.player.x + Math.cos(a) * d, y: G.player.y + Math.sin(a) * d };
 }
 
-function spawnEnemy(type, at, forceNormal = false) {
+function spawnEnemy(type, at, forceNormal = false, forceElite = false) {
   const def = ENEMIES[type];
   // Time-based scaling stops at FINAL_AT. The last fight is a designed encounter
   // with its own escalation (the Devourer's rage), not one more tick of the curve;
@@ -274,11 +280,18 @@ function spawnEnemy(type, at, forceNormal = false) {
   // charging the full multiplier on top made Nightmare 0 for 12 at the wall.
   const hpMult = def.final ? 1 + (G.diff.hp - 1) * 0.7
     : (Math.pow(2, t / TUNE.hpDouble) + (def.boss ? (G.bossCount - 1) * 0.75 : 0)) * G.diff.hp;
-  const dmgMult = (1 + t / 200) * G.diff.dmg;
+  // Contact damage is scaled separately from ranged. In a horde game the player is
+  // touching something almost every frame the invulnerability window allows, so
+  // chaff has to be nearly harmless on contact — the threat is being surrounded and
+  // unable to move, plus the things that shoot.
+  const dmgMult = (1 + t / TUNE.dmgRamp) * G.diff.dmg * (def.boss ? 1 : TUNE.contactMul);
   const p = at || spawnPoint();
-  // Elites: rare, fat, slow, worth a lot — they hand out the run's power spikes.
-  // They also get steadily more common, which is most of the late-game pressure.
-  const elite = !forceNormal && !def.boss && t > 45 && random() < 0.035 + t / 14000;
+  // Elites are a power-spike delivery system, so their cadence is per SECOND and
+  // lives in the director — NOT a percentage of each spawn. That percentage was
+  // written when the chaff rate was a tenth of what v1.4 made it, and it turned
+  // "rare" into thirty screen-clearing Orbital Strikes and forty-nine heals a
+  // minute. An item that arrives every two seconds is not a power spike.
+  const elite = forceElite && !forceNormal && !def.boss;
   const hp = (def.final ? TUNE.finalHp : def.hp) * hpMult * (elite ? 4 : 1);
   G.enemies.push({
     type, x: p.x, y: p.y, vx: 0, vy: 0, hp, maxHp: hp,
@@ -341,11 +354,21 @@ function director(dt) {
   const table = SPAWN_TABLE.filter(r => t >= r[0]).map(r => ({ type: r[1], weight: r[2] }));
   while (G.spawnAcc >= 1) {
     G.spawnAcc--;
-    if (G.enemies.length >= ENEMY_CAP) break;
+    if (G.enemies.length >= TUNE.enemyCap) break;
     spawnEnemy(weightedPick(table).type);
   }
+  // Elites on their own clock, independent of how thick the chaff is.
+  if (t > 45 && !G.final) {
+    G.eliteAcc += dt * (TUNE.eliteBase + t / TUNE.eliteRamp) * G.diff.spawn;
+    while (G.eliteAcc >= 1) {
+      G.eliteAcc--;
+      if (G.enemies.length >= TUNE.enemyCap) break;
+      spawnEnemy(weightedPick(table).type, null, false, true);
+    }
+  }
+
   // occasional tight cluster for pressure
-  if (t > 55 && random() < dt * 0.12 && G.enemies.length < ENEMY_CAP - 20) {
+  if (t > 55 && random() < dt * 0.12 && G.enemies.length < TUNE.enemyCap - 20) {
     const c = spawnPoint(), type = weightedPick(table).type;
     for (let i = 0; i < 10; i++) spawnEnemy(type, { x: c.x + rand(70, -70), y: c.y + rand(70, -70) });
   }
@@ -389,6 +412,10 @@ export function update(dt) {
 
   /* enemies */
   const cull = (spawnRing() + 380) ** 2;
+  // Two rules at once: never be shot from off screen, and never let a bigger
+  // monitor mean more incoming fire. The viewport term is the fairness half; the
+  // absolute cap is the difficulty half, and it binds on anything above ~1000px.
+  const shootRange = Math.min(Math.max(G.view.w, G.view.h) * 0.52, 520) ** 2;
   for (const e of G.enemies) {
     const a = angleTo(e, p);
     let ax = Math.cos(a), ay = Math.sin(a);
@@ -409,14 +436,18 @@ export function update(dt) {
         for (let i = 0; i < 8; i++) {
           const ang = base + i * TAU / 8;
           G.ebullets.push({ x: e.x, y: e.y, vx: Math.cos(ang) * 200, vy: Math.sin(ang) * 200,
-            r: 6, dmg: 12 * G.diff.dmg * (1 + scaleT() / 200), life: 4.5, color: '#ff4d5e' });
+            r: 6, dmg: 12 * G.diff.dmg * (1 + scaleT() / TUNE.dmgRamp), life: 4.5, color: '#ff4d5e' });
         }
       }
     }
 
     if (e.def.final) updateDevourer(e, dt);
 
-    if (e.def.shoot) {
+    // Shooters only fire from on screen. Enemy bullet volume scales linearly with
+    // enemy count, and v1.4 multiplied enemy count by ten: measured, 94% of all
+    // damage the player took was bullets, most of them launched from somewhere the
+    // player could not see. A shot you cannot see coming is not difficulty.
+    if (e.def.shoot && (e.boss || (e.x - p.x) ** 2 + (e.y - p.y) ** 2 < shootRange)) {
       e.shootT += dt;
       if (e.shootT >= e.def.shoot.cd) {
         e.shootT = 0;
@@ -664,7 +695,7 @@ function updateDevourer(e, dt) {
     G.texts.push({ x: e.x, y: e.y - e.r - 26, t: 0, v: `PHASE ${phase}`, color: '#ff2f6d', big: true, life: 1.6 });
   }
   e.speed = e.def.speed * (1 + r * 0.9 + over * 0.85 + (e.phase - 1) * 0.16);
-  e.dmg = e.def.dmg * G.diff.dmg * (1 + scaleT() / 200) * (1 + over * 1.3);
+  e.dmg = e.def.dmg * G.diff.dmg * (1 + scaleT() / TUNE.dmgRamp) * (1 + over * 1.3);
 
   const arms = 2 + e.phase;
   e.spiral += dt * (1.5 + e.rage * 0.7);

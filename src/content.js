@@ -205,7 +205,7 @@ export const MODULES = [
 export const DIFFICULTIES = [
   { id: 'recruit', name: 'RECRUIT', desc: 'A shorter climb to the Devourer', hp: 0.74, dmg: 0.86, spawn: 0.9 },
   { id: 'veteran', name: 'VETERAN', desc: 'The intended fight', hp: 1, dmg: 1, spawn: 1 },
-  { id: 'nightmare', name: 'NIGHTMARE', desc: 'For a build that already works', hp: 1.4, dmg: 1.15, spawn: 1.14 },
+  { id: 'nightmare', name: 'NIGHTMARE', desc: 'For a build that already works', hp: 1.28, dmg: 1.12, spawn: 1.1 },
 ];
 
 // [startTime, type, weight] — director samples from entries unlocked at time t.
@@ -217,11 +217,17 @@ export const SPAWN_TABLE = [
   [110, 'weaver', 4],
   [150, 'brute', 4],
   [200, 'darter', 8],
-  // Act III leans on ranged attackers: an evolved build clears its own radius,
-  // so melee chaff stops mattering and only bullets still threaten the player.
-  [210, 'spitter', 10],
-  [270, 'weaver', 10],
-  [330, 'spitter', 14],
+  // Act III leans on ranged attackers: an evolved build clears its own radius, so
+  // melee chaff stops mattering and only bullets still threaten the player. These
+  // weights were written for a dozen enemies on screen; at forty, a third of the
+  // field shooting is not "leaning on ranged attackers", it is a solid wall of
+  // bullets, so the shooter share is now much smaller and the horde carries the
+  // pressure instead.
+  [210, 'spitter', 5],
+  [230, 'drone', 12],
+  [270, 'weaver', 6],
+  [300, 'darter', 12],
+  [330, 'spitter', 6],
 ];
 
 export const BOSS_INTERVAL = 90; // seconds

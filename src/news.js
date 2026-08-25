@@ -1,7 +1,19 @@
 /** Version + patch notes. `NEWS[0]` is the current announcement; the rest is history. */
-export const VERSION = 'v1.4';
+export const VERSION = 'v1.5';
 
 export const NEWS = [
+  {
+    v: 'v1.5', title: 'What the Horde Broke',
+    notes: [
+      'v1.4 multiplied the number of enemies by about ten. Three separate systems were tuned as a <em>percentage of each spawn</em> and quietly became firehoses. This release is about finding them.',
+      '<b>Elites were rolled per spawn</b>, so ten times the chaff meant ten times the elites — and elites are what drop items. Measured: <b>thirty Orbital Strikes a minute</b>, one screen-clearing explosion every two seconds, and forty-nine heal pickups a minute. An item that arrives every two seconds is not a power spike, it is weather. Elites now arrive on their own clock, about two Orbital Strikes a minute.',
+      'That healing was also, accidentally, the entire difficulty balance — roughly 3,300 health a minute against about 12 a second of incoming damage. It has been replaced with <b>steady regeneration</b>: the same sustain, made intentional, quiet and tunable, and visible in the pause menu.',
+      '<b>Enemies no longer shoot you from off screen.</b> 94% of all damage the player took was bullets, most of them fired by something they could not see. Shooters now need to be on screen — and never further than 520px, so a bigger monitor does not mean more incoming fire.',
+      'Act III leaned on ranged attackers by design, but those weights were written for a dozen enemies on screen. At forty, a third of the field shooting is a solid wall, so the shooter share is much smaller and the horde carries the pressure instead.',
+      'Fixed in the balance harness itself, which matters more than any of the above: <b>the bot could not see bullets.</b> Its threat field contained enemies only. That was survivable while bullets were a minor damage source; once they were 94% of it, the instrument every balance decision in this project rests on was measuring a player who walks straight through gunfire. It dodges now.',
+      'Tuned around the honest numbers: Recruit clears about 3 runs in 5, Veteran about 2 in 5, Nightmare about 1 in 16.',
+    ],
+  },
   {
     v: 'v1.4', title: 'The Gun',
     notes: [
