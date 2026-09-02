@@ -246,7 +246,7 @@ export const STAT_UPGRADES = [
   { id: 'rate', icon: '⏱', name: 'Rapid Cycling', desc: 'Fire faster', apply: p => { p.rateN = (p.rateN || 0) + 1; p.rate = 1 / (1 + 0.14 * p.rateN); } },
   { id: 'speed', icon: '👟', name: 'Thrusters', desc: '+16 movement speed', apply: p => p.speed += 16 },
   { id: 'hp', icon: '❤', name: 'Plating', desc: '+28 max HP, and heal for it', apply: p => { p.maxHp += 28; p.hp += 28; } },
-  { id: 'regen', icon: '✚', name: 'Nanorepair', desc: 'Regenerate +0.7 HP per second', apply: p => p.regen += 0.7 },
+  { id: 'regen', icon: '✚', name: 'Nanorepair', desc: 'Regenerate +2 HP per second', apply: p => p.regen += 2 },
   { id: 'armor', icon: '🛡', name: 'Deflectors', desc: 'Take less damage', apply: p => { p.armorN = (p.armorN || 0) + 1; p.armor = 1 / (1 + 0.16 * p.armorN); } },
   { id: 'pickup', icon: '🧲', name: 'Mag Coil', desc: '+40 pickup range', apply: p => p.pickup += 40 },
   { id: 'crit', icon: '🎯', name: 'Weak Point Analysis', desc: '+9% crit chance (double damage)', apply: p => p.crit += 0.09 },

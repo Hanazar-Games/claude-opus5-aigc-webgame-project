@@ -1,7 +1,17 @@
 /** Version + patch notes. `NEWS[0]` is the current announcement; the rest is history. */
-export const VERSION = 'v1.5';
+export const VERSION = 'v1.6';
 
 export const NEWS = [
+  {
+    v: 'v1.6', title: 'Shipping It',
+    notes: [
+      '<b>Deployment is fixed.</b> Every CI failure this project has ever had was a win-rate gate — "8.3% below 12%", "45.8% above 45%" — and not one was a real defect. Win rate is a statistical measurement of a chaotic system, and <code>Math.hypot</code> is not bit-identical across engines: v1.4 measured 34.4% on the development machine and 8.3% on the build runner, from the same seeds. Releases are now gated on <b>invariants</b> instead — bosses killed never exceed bosses spawned, no stat is ever a non-finite number, no run fails to end — which are true on any machine. The pipeline went from 21 minutes to 6, and can no longer block the site over a coin flip.',
+      'Fixed: last release said enemies no longer shoot from off screen. Half of them still did. The Volley modifier had no range check at all, Motherships were exempted outright, and the check itself was a <em>circle</em> measured against a <em>rectangular</em> screen — on a 900×620 window the radius reached 468px against a 310px half-height, so everything above and below kept firing blind. Measured now: 0.2% of shots before the final boss are fired from outside the view, against 51.9% before.',
+      'The Devourer still fires from anywhere, on purpose. It is the arena; running out of sight of it should not be free.',
+      'Fixed: the particle pool reached 5,513 live pieces at the new kill rate. It is capped now — except for your own death, which is the one explosion that should never be swallowed by a budget.',
+      'Nanorepair was quietly a dead card: +0.7 health per second on top of a base of 5 is +14%. It is +2 now.',
+    ],
+  },
   {
     v: 'v1.5', title: 'What the Horde Broke',
     notes: [

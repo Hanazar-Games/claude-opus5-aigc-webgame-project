@@ -28,7 +28,7 @@ inside one long enough and you strip it for a module you cannot get any other wa
   - 🔵 **Haste** — accelerates continuously until it catches you
 - **Items** — ✚ Heal · Magnet (pulls in every orb on the field) · Orbital Strike (screen-wide blast)
 - Off-screen Motherships, elites and items are flagged by arrows at the screen edge
-- Nothing shoots you from off screen, and never from further than 520px
+- Nothing shoots you from off screen, and never from further than 520px — except the Devourer, which is the arena
 
 ### The arc
 
@@ -195,8 +195,16 @@ faces the same density. Two assertions:
 - an evolution must be at least 1.25× the maxed weapon it consumes (v0.9 caught
   Starbreaker at 0.98×)
 
-CI runs both tools before every deploy and refuses to ship on a violated
-invariant, a weapon regression, or a win rate outside the intended band per tier.
+CI runs both tools before every deploy, but only the **deterministic** half can
+block a release: module parsing, the weapon-bench monotonicity assertions, and the
+invariants. Win rates are reported and never gate.
+
+That split was learned the hard way. Every CI failure this project ever had was a
+win-rate band — `8.3% < 12%`, `45.8% > 45%` — and none was a real defect. Win rate
+is a statistical measurement of a chaotic system, and `Math.hypot`/`Math.atan2` are
+not bit-identical across engines: v1.4 measured **34.4% locally and 8.3% on the
+runner from the same seeds**. Gating a release on a number that cannot be reproduced
+where it is checked is worse than not gating at all.
 
 ## Devlog
 

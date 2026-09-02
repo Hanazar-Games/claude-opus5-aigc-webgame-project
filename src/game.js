@@ -167,7 +167,7 @@ function killEnemy(e) {
     G.orbs.push({ x: e.x + rand(20, -20), y: e.y + rand(20, -20), vx: rand(60, -60), vy: rand(60, -60), xp: e.xp / n, r: e.elite || e.boss ? 7 : 5 });
   if (e.def.final) {
     G.cam.shake = 34; sfx.boss();
-    burst(e.x, e.y, e.color, 90, 420);
+    burst(e.x, e.y, e.color, 90, 420, true);
     G.state = 'won';
     G.onWin?.();
     return;
@@ -222,12 +222,17 @@ function hurtPlayer(dmg) {
   if (p.reactive) G.novaBlast(p.x, p.y, 150 + p.reactive * 40, 45 + scaleT() * 0.9, 300);
   if (p.hp <= 0) {
     p.hp = 0; G.state = 'dead'; sfx.dead();
-    burst(p.x, p.y, '#4df3ff', 50, 300);
+    burst(p.x, p.y, '#4df3ff', 50, 300, true);
     G.onDeath?.();
   }
 }
 
-function burst(x, y, color, n, spd) {
+const PART_CAP = 900;
+function burst(x, y, color, n, spd, force = false) {
+  // Decoration only, so it yields rather than growing without bound: at the new
+  // kill rate the pool peaked over five thousand live quads. `force` is for the
+  // one burst that must never be swallowed — the player's own death.
+  if (!force) n = Math.min(n, PART_CAP - G.parts.length);
   for (let i = 0; i < n; i++) {
     const a = rand(TAU), s = rand(spd, spd * 0.2);
     G.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.6, 0.25), max: 0.6, color, r: rand(3.4, 1.2) });
@@ -415,7 +420,15 @@ export function update(dt) {
   // Two rules at once: never be shot from off screen, and never let a bigger
   // monitor mean more incoming fire. The viewport term is the fairness half; the
   // absolute cap is the difficulty half, and it binds on anything above ~1000px.
-  const shootRange = Math.min(Math.max(G.view.w, G.view.h) * 0.52, 520) ** 2;
+  // The screen is a RECTANGLE. A radius of half the long side reaches well past the
+  // short edges — on 900x620 the vertical half is 310px against a 468px radius — so
+  // a third of all shots were still being fired from above and below the view. The
+  // 520 cap is the difficulty half of the rule: a bigger monitor must not mean more
+  // incoming fire. The margin covers the camera's forward lead.
+  // Centred on the CAMERA, not the player: the camera leads by up to 40px in the
+  // direction of travel, and the viewport is what the player can actually see.
+  const seeX = Math.min(G.view.w / 2 + 30, 520), seeY = Math.min(G.view.h / 2 + 30, 520);
+  const onScreen = e => Math.abs(e.x - G.cam.x) < seeX && Math.abs(e.y - G.cam.y) < seeY;
   for (const e of G.enemies) {
     const a = angleTo(e, p);
     let ax = Math.cos(a), ay = Math.sin(a);
@@ -428,7 +441,7 @@ export function update(dt) {
     e.orbCd = Math.max(0, e.orbCd - dt);
 
     if (e.affix === 'haste') e.speed = Math.min(e.speed * (1 + dt * 0.11), 300);
-    if (e.affix === 'volley') {
+    if (e.affix === 'volley' && onScreen(e)) {
       e.volleyT += dt;
       if (e.volleyT >= 2.4) {
         e.volleyT = 0;
@@ -447,7 +460,10 @@ export function update(dt) {
     // enemy count, and v1.4 multiplied enemy count by ten: measured, 94% of all
     // damage the player took was bullets, most of them launched from somewhere the
     // player could not see. A shot you cannot see coming is not difficulty.
-    if (e.def.shoot && (e.boss || (e.x - p.x) ** 2 + (e.y - p.y) ** 2 < shootRange)) {
+    // The Devourer is the arena and always fires; everything else, Motherships
+    // included, has to be on screen. v1.5 gated only `def.shoot` and exempted every
+    // boss, and half of all enemy bullets were still being born outside the viewport.
+    if (e.def.shoot && (e.def.final || onScreen(e))) {
       e.shootT += dt;
       if (e.shootT >= e.def.shoot.cd) {
         e.shootT = 0;
