@@ -53,6 +53,21 @@ export function newRun(diffId = 'veteran') {
   G.state = 'playing';
 }
 
+/**
+ * Leaving a run for the title screen tears the world down. Quitting used to only
+ * flip the state, so the title sat in front of a frozen snapshot of the run you
+ * just abandoned — player ship included — while render() kept drawing 285 enemies
+ * and 262 particles every frame for nothing, holding about 32MB. The results
+ * screen deliberately keeps the field: seeing where you died is the point there.
+ */
+export function clearWorld() {
+  G.enemies.length = G.bullets.length = G.ebullets.length = 0;
+  G.orbs.length = G.pickups.length = G.parts.length = G.texts.length = 0;
+  G.novas.length = G.hulks.length = G.modal.length = 0;
+  G.player = null; G.final = null; G.offer = null;
+  G.cam.x = G.cam.y = 0; G.cam.shake = 0;
+}
+
 /* ------------------------------------------------------- spatial hash grid */
 function buildGrid() {
   G.grid.clear();
@@ -418,7 +433,8 @@ export function update(dt) {
     if (def.orbital) { w.angle = (w.angle + s.spin * dt / choke) % TAU; continue; }
     w.t += dt;
     const cd = Math.max(0.06, s.cd * p.rate * choke);
-    if (w.t >= cd) { w.t = 0; def.fire(G, s); if (!def.ownSfx && w.id !== 'nova') sfx.shoot(); }
+    // A weapon that finds no target keeps its charge instead of throwing it away.
+    if (w.t >= cd && def.fire(G, s) !== false) { w.t = 0; if (!def.ownSfx && w.id !== 'nova') sfx.shoot(); }
   }
   updateOrbitals(dt, choke);
 

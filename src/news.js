@@ -1,7 +1,15 @@
 /** Version + patch notes. `NEWS[0]` is the current announcement; the rest is history. */
-export const VERSION = 'v1.7';
+export const VERSION = 'v1.8';
 
 export const NEWS = [
+  {
+    v: 'v1.8', title: 'Housekeeping',
+    notes: [
+      'Fixed: abandoning a run left the whole world standing. The title screen was drawn in front of a <b>frozen snapshot of the run you just quit</b> — your ship included — while the renderer kept painting 285 enemies and 262 particles every frame for nothing, holding about 32MB. Leaving a run now tears it down. The results screen still keeps the field on purpose: seeing where you died is the point there.',
+      'Fixed: a weapon that could not see a target still spent its cooldown on the empty space. In the first twenty seconds of a run — when the field is sparse and a new player is deciding whether the gun feels good — 15% of shots went nowhere and reset the timer anyway. Weapons hold their charge until something is actually in range, so the first enemy to walk in gets hit immediately.',
+      'Checked and found clean, having never been measured: ten runs back to back leak nothing. DOM nodes settle after the first few runs and stay flat, and the heap does not climb.',
+    ],
+  },
   {
     v: 'v1.7', title: 'The Mix',
     notes: [

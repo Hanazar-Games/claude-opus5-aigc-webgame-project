@@ -1,4 +1,4 @@
-import { G, applyCard, applyModule, newRun } from './game.js';
+import { G, applyCard, applyModule, newRun, clearWorld } from './game.js';
 import { WEAPONS, MODULES, DIFFICULTIES, ACTS, FINAL_AT } from './content.js';
 import { fmtTime, fmtBig } from './util.js';
 import { sfx, unlockAudio, startMusic, stopMusic, setMusicPaused, setMusicFinal, salvageHum, setMuted, loadMuted, music } from './audio.js';
@@ -66,7 +66,7 @@ export function initUI() {
     const a = btn.dataset.action;
     if (a === 'start') { startRun(); }
     else if (a === 'resume') { G.state = 'playing'; showPanel(null); setMusicPaused(false); }
-    else if (a === 'quit') { G.state = 'title'; showPanel('title'); stopMusic(); clearBanners(); buildDiffs(); }
+    else if (a === 'quit') { G.state = 'title'; clearWorld(); showPanel('title'); stopMusic(); clearBanners(); buildDiffs(); }
     else if (a === 'news') {
       prevPanel = G.state === 'paused' ? 'pause' : 'title';
       showPanel('news');
