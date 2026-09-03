@@ -132,12 +132,19 @@ G.spawnBullet = o => {
   });
 };
 
+/**
+ * Blasts get their OWN query buffer. `_q` is shared by every queryGrid caller, and
+ * the player-bullet loop iterates it with for-of while a blast-on-impact re-enters
+ * queryGrid from inside that same loop — today the `break` immediately after saves
+ * it, which is safety by luck rather than by design.
+ */
+const _qNova = [];
 G.novaBlast = (x, y, radius, dmg, knock) => {
   const r = radius * G.player.area;
   G.novas.push({ x, y, r, t: 0, dur: 0.42 });
   G.cam.shake = Math.max(G.cam.shake, 7);
   sfx.nova();
-  for (const e of queryGrid(x, y, r + 40, _q)) {
+  for (const e of queryGrid(x, y, r + 40, _qNova)) {
     const dx = e.x - x, dy = e.y - y, d = Math.hypot(dx, dy);
     if (d > r + e.r) continue;
     damageEnemy(e, dmg * G.player.damage);
@@ -460,10 +467,11 @@ export function update(dt) {
     // enemy count, and v1.4 multiplied enemy count by ten: measured, 94% of all
     // damage the player took was bullets, most of them launched from somewhere the
     // player could not see. A shot you cannot see coming is not difficulty.
-    // The Devourer is the arena and always fires; everything else, Motherships
-    // included, has to be on screen. v1.5 gated only `def.shoot` and exempted every
-    // boss, and half of all enemy bullets were still being born outside the viewport.
-    if (e.def.shoot && (e.def.final || onScreen(e))) {
+    // Everything with a `shoot` block — Motherships included — has to be on screen.
+    // v1.5 gated only some of them and half of all enemy bullets were still born
+    // outside the viewport. (The Devourer is not handled here: it has no `shoot`
+    // block, it fires from updateDevourer, and that is deliberately ungated.)
+    if (e.def.shoot && onScreen(e)) {
       e.shootT += dt;
       if (e.shootT >= e.def.shoot.cd) {
         e.shootT = 0;

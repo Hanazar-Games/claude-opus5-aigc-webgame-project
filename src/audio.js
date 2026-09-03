@@ -69,6 +69,12 @@ function noise({ dur = 0.18, vol = 0.25, freq = 900, dest = null }) {
  *
  * Repeats inside `gap` are folded into the next play and make it *bigger*
  * instead, so a crowd wipe lands as one weighty hit rather than a crackle.
+ *
+ * The gaps below were set when the game killed about six things a second. It now
+ * kills thirty, collects thirty orbs, and lands sixteen hits — 83 sfx calls a
+ * second, and the old gaps let about 71 of them through. Seventy-one overlapping
+ * voices a second is not sound design, it is a wash that buries the soundtrack.
+ * Wider gaps, and the swell does the work: fewer sounds, each carrying more.
  */
 const gates = new Map();
 function gate(key, gap, fn) {
@@ -78,15 +84,15 @@ function gate(key, gap, fn) {
   fn(g ? g.n : 0);
   gates.set(key, { t: now, n: 0 });
 }
-const swell = (n, per = 0.1, cap = 7) => 1 + Math.min(n, cap) * per;
+const swell = (n, per = 0.1, cap = 12) => 1 + Math.min(n, cap) * per;
 
 export const sfx = {
   /* --- high-frequency combat sounds: gated, and louder for what they swallowed --- */
-  shoot: () => gate('shoot', 0.05, n => tone({ freq: 760, to: 300, dur: 0.07, type: 'square', vol: 0.085 * swell(n, 0.06, 4) })),
-  hit: () => gate('hit', 0.045, n => tone({ freq: 220, to: 120, dur: 0.06, type: 'triangle', vol: 0.11 * swell(n, 0.07, 5) })),
-  kill: () => gate('kill', 0.05, n => noise({ dur: 0.14, vol: 0.16 * swell(n), freq: 1400 - Math.min(n, 7) * 90 })),
-  pickup: () => gate('pickup', 0.035, n => tone({ freq: 880 + Math.min(n, 5) * 40, to: 1320, dur: 0.06, type: 'sine', vol: 0.09 * swell(n, 0.06, 4) })),
-  nova: () => gate('nova', 0.09, n => tone({ freq: 120, to: 40, dur: 0.34, type: 'sine', vol: 0.28 * swell(n, 0.08, 3) })),
+  shoot: () => gate('shoot', 0.08, n => tone({ freq: 760, to: 300, dur: 0.07, type: 'square', vol: 0.085 * swell(n, 0.06, 4) })),
+  hit: () => gate('hit', 0.15, n => tone({ freq: 220, to: 120, dur: 0.06, type: 'triangle', vol: 0.11 * swell(n, 0.07, 5) })),
+  kill: () => gate('kill', 0.15, n => noise({ dur: 0.14 + Math.min(n, 12) * 0.004, vol: 0.16 * swell(n, 0.07), freq: 1400 - Math.min(n, 12) * 55 })),
+  pickup: () => gate('pickup', 0.16, n => tone({ freq: 880 + Math.min(n, 5) * 40, to: 1320, dur: 0.06, type: 'sine', vol: 0.09 * swell(n, 0.06, 4) })),
+  nova: () => gate('nova', 0.16, n => tone({ freq: 120, to: 40, dur: 0.34, type: 'sine', vol: 0.28 * swell(n, 0.08, 3) })),
   hurt: () => { tone({ freq: 180, to: 60, dur: 0.22, type: 'sawtooth', vol: 0.22 }); noise({ dur: 0.2, freq: 400 }); },
 
   /* --- one-off events: never gated, they are the ones you must not miss --- */

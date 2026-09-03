@@ -1,7 +1,16 @@
 /** Version + patch notes. `NEWS[0]` is the current announcement; the rest is history. */
-export const VERSION = 'v1.6';
+export const VERSION = 'v1.7';
 
 export const NEWS = [
+  {
+    v: 'v1.7', title: 'The Mix',
+    notes: [
+      '<b>The sound was a wash.</b> Measured across a full run: 83 sound effects requested per second, 71 of them getting through, and a single frame asking for 305. Those thresholds were set when the game killed about six things a second — it now kills thirty, collects thirty pieces of stardust and lands sixteen hits. Seventy-one overlapping voices a second is not sound design, it buries the soundtrack under its own combat. Down to 26, and the ones that do play are bigger: a kill sound now deepens and lengthens with the size of the wipe it is standing in for.',
+      'Fixed a latent one: every spatial query in the game shared a single scratch buffer, and the bullet-collision loop iterates that buffer while a blast-on-impact re-enters the same query from inside it. Today a <code>break</code> lands one line later and saves it — safety by luck. Blasts have their own buffer now.',
+      'Removed a branch that could not run, and the comment above it that described what it was supposed to do: the Devourer was exempted from the on-screen firing rule through a code path it never takes, because it has no ordinary weapon at all. It fires from its own routine, which is ungated on purpose — it is the arena.',
+      'Checked and found healthy, having never been measured before: the touch stick (a second finger cannot steal it, lifting the other finger does not release it, and drags past the edge clamp cleanly), and the opening pace — the first upgrade lands at 11.6 seconds and the gun is a maxed nine-pellet spread by 28.7.',
+    ],
+  },
   {
     v: 'v1.6', title: 'Shipping It',
     notes: [
